@@ -2,6 +2,7 @@
 use std::arch::x86_64::*;
 
 // transpose a 16x16 matrix
+#[target_feature(enable = "avx2")]
 pub unsafe fn transpose(a: [__m256i;16]) -> [__m256i;16]{
     let mut t0 = [_mm256_setzero_si256(); 16];
     let mut t1 = [_mm256_setzero_si256(); 16];

@@ -5,7 +5,7 @@ for i in range(1, 256):
     if a > 2^8 and is_prime(a):
         l.append(a)
 print(l)
-t = [769, 3329, 7681, 7937, 9473, 10753]
+t = [7681, 10753, 11777, 12289, 13313, 15361]
 z = 1
 for k in t:
     z = z*k

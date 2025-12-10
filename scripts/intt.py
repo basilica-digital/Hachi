@@ -1,6 +1,7 @@
-field = [257, 3329, 7681, 7937, 9473, 10753]
+field = [7681, 10753, 11777, 12289, 13313, 15361]
 
 def intt(a):
+    print("#[target_feature(enable = "avx2")]")
     print("pub unsafe fn intt_"+str(a)+"(s0: [__m256i;16]) -> [__m256i;16]{")
     print("    let s1 = intt5678_"+str(a)+"(s0);")
     print("    let s2 = transpose(s1);")
@@ -9,6 +10,7 @@ def intt(a):
 
 
 def intt_l1(a):
+    print("#[target_feature(enable = "avx2")]")
     print("pub unsafe fn intt1234_"+str(a)+"(a: [__m256i;16]) -> [__m256i;16]{")
     print("    let mut a0: [__m256i;16] = [_mm256_setzero_si256(); 16];")
     print("    let mut a1: [__m256i;16] = [_mm256_setzero_si256(); 16];")
@@ -36,6 +38,7 @@ def intt_l1(a):
     print("}\n")
 
 def intt_l2(a):
+    print("#[target_feature(enable = "avx2")]")
     print("pub unsafe fn intt5678_"+str(a)+"(a: [__m256i;16]) -> [__m256i;16]{")
     print("    let mut a0: [__m256i;16] = [_mm256_setzero_si256(); 16];")
     print("    let mut a1: [__m256i;16] = [_mm256_setzero_si256(); 16];")
