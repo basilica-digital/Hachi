@@ -12,5 +12,5 @@ for i in range(len(f)):
     print("    let d1 = _mm256_mulhi_epi32(y, _mm256_set1_epi32("+str(b[i])+"));")
     print("    let e1 = _mm256_mullo_epi32(d1, _mm256_set1_epi32("+str(f[i])+"));")
     print("    let f1 = _mm256_sub_epi16(y, e1);")
-    print("    let ans = pack_32_16(f, f1);\n}\n")
+    print("    let ans = pack_32_16(f, f1);\n    ans\n}\n")
     

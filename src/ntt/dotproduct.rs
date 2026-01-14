@@ -1,3 +1,6 @@
+use std::arch::x86_64::*;
+use crate::field::fields::*;
+
 #[target_feature(enable = "avx2")]
 pub unsafe fn dot_product_7681(a: [__m256i;16], b: [__m256i;16]) -> [__m256i;16]{
     let mut c: [__m256i;16] = [_mm256_setzero_si256(); 16]; 

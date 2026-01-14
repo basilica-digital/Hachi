@@ -1,5 +1,5 @@
-f = [257, 3329, 7681, 7937, 9473, 10753]
-b = [85, 20, 9, 8, 7, 6]
+f = [7681, 10753, 11777, 12289, 13313, 15361]
+b = [round((2**16)/i) for i in f]
 
 for i in range(len(f)):
     print("#[target_feature(enable = \"avx2\")]")

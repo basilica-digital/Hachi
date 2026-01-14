@@ -1,24 +1,31 @@
 """
 fields = [7681, 10753, 11777, 12289, 13313, 15361]
 
+def to16(a, q):
+    if a > q/2:
+        return a-q
+    return a
+
 def root_of_unity_to_mm256(z, f):
     k.<x> = GF(f)
     a = []
     for i in z:
-        a.append(int(k(i).sqrt()))
+        a.append(int((k(i).sqrt())))
     b = [[] for i in range(len(a)//16)]
     for i in range(len(b)):
         for j in range(16):
-            b[i].append(a[i*16+j])
+            b[i].append(a[len(b)*j+i])
             
     s = ""
     for i in b:
         s += "_mm256_set_epi16("
-        for j in i:
-            s += str(j) + ", "
+        for j in range(len(i)-1, -1, -1):
+            tt = to16(i[j], f)
+            s += str(tt) + ", "
         s = s[:-2] + "), _mm256_set_epi16("
-        for j in i:
-            s += str(round(j*2^16/f)) + ", "
+        for j in range(len(i)-1, -1, -1):
+            tt = to16(i[j], f)
+            s += str(round(tt*2^16/f)) + ", "
         s = s[:-2] + "), "
     return s[:-2]
     
@@ -28,13 +35,16 @@ for f in fields:
     tmp = [[]for i in range(8)]
     tmp[0].append(int(k(-1).sqrt()))
     tmp[0].append(-tmp[0][0])
-    print("    let l1:[__m256i;2] = [_mm256_set1_epi16("+str(int(k(-1).sqrt()))+"), _mm256_set1_epi16("+str(round(int(k(-1).sqrt())*2^16/f))+")];")
+    tt = to16(int((k(-1).sqrt())), f)
+    # reindex twiddle factor for layer 6, 7, 8
+    print("    let l1:[__m256i;2] = [_mm256_set1_epi16("+str(tt)+"), _mm256_set1_epi16("+str(round(tt*2^16/f))+")];")
     for i in range(1, 4):
         s = "    let l" + str(i+1) + ":[__m256i;"+str(2^(i+1))+"] = ["
         for j in range(len(tmp[i-1])):
-            t = int(k(tmp[i-1][j]).sqrt())
-            s += "_mm256_set1_epi16("+str(t)+"), "
-            s += "_mm256_set1_epi16("+str(round(t*2^16/f))+"), "
+            t = (k(tmp[i-1][j]).sqrt())
+            tt = to16(int(t), f)
+            s += "_mm256_set1_epi16("+str(tt)+"), "
+            s += "_mm256_set1_epi16("+str(round(tt*2^16/f))+"), "
             tmp[i].append(t)
             tmp[i].append(-t)
         print(s[:-2] + "];")
