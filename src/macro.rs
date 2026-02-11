@@ -25,13 +25,22 @@ pub unsafe fn store_m512_to_vec(src: __m512i, dst: &mut [u32], offset: usize) {
     _mm512_storeu_si512(ptr, src)
 }
 
-pub fn generate_random_data(sz: usize, n: usize) -> Vec<u32> {
-    let mut rng = thread_rng();
-    let sz = 1 << 23;
+pub fn generate_random_data_4bit(sz: usize, n: usize) -> Vec<u32> {
     let total = sz * n;
-    let mut data = Vec::with_capacity(total);
-    for _ in 0..total {
-        data.push(rng.next_u32()& 0xF);
-    }
+    let mut data = vec![0u32; total];
+    data.par_iter_mut().for_each(|x| {
+        let mut rng = thread_rng();
+        *x = rng.next_u32() & 0xF;
+    });
+    data
+}
+
+pub fn generate_random_data_30bit(sz: usize, n: usize) -> Vec<u32> {
+    let total = sz * n;
+    let mut data = vec![0u32; total];
+    data.par_iter_mut().for_each(|x| {
+        let mut rng = thread_rng();
+        *x = rng.next_u32() & 0x3FFFFFFF;
+    });
     data
 }
