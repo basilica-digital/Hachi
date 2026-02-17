@@ -40,7 +40,7 @@ pub fn generate_random_data_30bit(sz: usize, n: usize) -> Vec<u32> {
     let mut data = vec![0u32; total];
     data.par_iter_mut().for_each(|x| {
         let mut rng = thread_rng();
-        *x = rng.next_u32() & 0x3FFFFFFF;
+        *x = rng.next_u32() & 0x3FFFFFFF; 
     });
     data
 }
