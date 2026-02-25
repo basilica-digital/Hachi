@@ -18,6 +18,7 @@ use crate::fields::fields::*;
 include!("macro.rs");
 include!("rns.rs");
 include!("foldwitness.rs");
+include!("foldwitness_jolt.rs");
 include!("commit.rs");
 
 #[inline(never)]
@@ -155,26 +156,58 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // println!("Memory test: {:?}", fw_duration);
 
 
-    // -----> Commit <-----
-    let start = Instant::now();
-    let n = 1 << 10;
-    let iterations = 1 << 10;
-    let height = 1 << 13;
-    let sz = 1 << 23;
-    let s = &mut generate_random_data_4bit(sz, n);
-    let acap1 = &mut generate_random_data_30bit(height, n);
-    let acap2 = &mut generate_random_data_30bit(height, n);
-    let mut u = vec![0u32; n];
+    // -----> FOLDING WITNESS JOLT <-----
+    let height = 16;
+    let dimention = 10;
+    let width = 8;
     
-    let init_duration = start.elapsed();
+    // init s [height][width][dimention]
+    let n: usize = 1 << (height+width+dimention);
 
-    println!("Init: {:?}", init_duration);
-    let start = Instant::now();
-    unsafe{
-        commit(&mut u, s, acap1, acap2);
+    let mut s: Vec<u64> = vec![0u64; n];
+    sparse_random_1(&mut s);
+
+    // init c [height][dimention]
+    let n: usize = 1 << (height+dimention);
+    let m = (1i64 << 31) - 19;
+    let mut c: Vec<i32> = (0..n).map(|_| thread_rng().gen_range(0..m as i32)).collect();
+
+    // init z [width][dimention]
+    let n: usize = 1 << (width+dimention);
+    let mut z: Vec<i32> = vec![0; n];
+
+    
+    // folding witness
+    unsafe {
+        for i in 0..6{
+            let start = Instant::now();
+            fold_witness_jolt(&mut z, &c, &s, 1<<i);
+            let fwj_duration = start.elapsed();
+            println!("batch={:?}: {:?}", 1<<i, fwj_duration);
+        }
     }
-    let commit_duration = start.elapsed();
-    println!("Commit: {:?}", commit_duration);
+
+
+    // // -----> Commit <-----
+    // let start = Instant::now();
+    // let n = 1 << 10;
+    // let iterations = 1 << 10;
+    // let height = 1 << 13;
+    // let sz = 1 << 23;
+    // let s = &mut generate_random_data_4bit(sz, n);
+    // let acap1 = &mut generate_random_data_30bit(height, n);
+    // let acap2 = &mut generate_random_data_30bit(height, n);
+    // let mut u = vec![0u32; n];
+    
+    // let init_duration = start.elapsed();
+
+    // println!("Init: {:?}", init_duration);
+    // let start = Instant::now();
+    // unsafe{
+    //     commit(&mut u, s, acap1, acap2);
+    // }
+    // let commit_duration = start.elapsed();
+    // println!("Commit: {:?}", commit_duration);
 
     // // -----> Ring multiplication test <-----
     // // let file = File::create("out.txt")?;

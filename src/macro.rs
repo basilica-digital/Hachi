@@ -44,3 +44,12 @@ pub fn generate_random_data_30bit(sz: usize, n: usize) -> Vec<u32> {
     });
     data
 }
+
+pub fn sparse_random_1(s: &mut Vec<u64>){
+    let mut rng = thread_rng();
+    // 2 + 16 + 8
+    for i in 0..(1<<26){
+        let index: usize = rng.gen_range(0..256);
+        s[i*4+index/64] = 1u64<<(index%64);
+    }
+}
