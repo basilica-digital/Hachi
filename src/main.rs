@@ -1,13 +1,17 @@
 mod fields;
 
 use tfhe_ntt::prime32::Plan;
+
 use std::slice;
 use std::fs::File;
 use std::io::{Write, BufWriter};
-use rand::Rng;
+use std::alloc::{alloc, dealloc, Layout};
+use std::ptr::NonNull;
 use std::time::Instant;
 use std::arch::x86_64::*;
 use std::hint::black_box;
+
+use rand::Rng;
 use rand::distributions::{Distribution, Uniform};
 use rand::thread_rng;
 use rand::RngCore;
@@ -21,15 +25,10 @@ include!("foldwitness.rs");
 include!("foldwitness_jolt.rs");
 include!("commit.rs");
 
-#[inline(never)]
-fn wrapped_fwd(plan: &Plan, data: &mut [u32]) {
-    plan.fwd(data);
-}
 
-#[inline(never)]
-fn wrapped_inv(plan: &Plan, data: &mut [u32]) {
-    plan.inv(data);
-}
+#[repr(C, align(64))]
+#[derive(Clone, Copy)]
+pub struct Align64<T>(pub T);
 
 #[inline(always)]
 pub unsafe fn add_ring(z: &mut [i16], s: &[i16]){
@@ -60,10 +59,7 @@ pub unsafe fn power(val: i16) -> i16{
     let mut v2 = val as i32 + 2;
     let mut v3 = val as i32 + 3;
     
-    // 讓迴圈次數夠多，確保運算密集
     for _ in 0..200_000 {
-        // 這四行指令互不相依，CPU 會嘗試在同一個週期內並行執行它們
-        // 這會耗盡物理核心的所有 ALU 資源
         v0 = v0.wrapping_mul(v0).wrapping_add(12345); 
         v1 = v1.wrapping_mul(v1).wrapping_add(23456);
         v2 = v2.wrapping_mul(v2).wrapping_add(34567);
@@ -72,7 +68,6 @@ pub unsafe fn power(val: i16) -> i16{
     
     (v0 ^ v1 ^ v2 ^ v3) as i16
 }
-
 
 
 #[inline(never)]
@@ -129,63 +124,71 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // println!("Core test: {:?}", duration);
 
 
-    // // -----> FOLDING WITNESS <-----
-    // // init s [2^13][2^10][2^10]
-    // let n: usize = 1 << 33;
+    // -----> FOLDING WITNESS <-----
+    // init s [2^13][2^10][2^10]
+    let n: usize = 1 << 33;
+    // let mut s_buf = vec![Align64([0i16; 32]); n / 32];
+    // let s = unsafe { std::slice::from_raw_parts_mut(s_buf.as_mut_ptr() as *mut i16, n) };
+    let mut s: Vec<i16> = vec![0i16; n];
+    thread_rng().fill(&mut s[..]);
+    for val in s.iter_mut() { *val &= 0xF; }
 
-    // let mut s: Vec<i16> = vec![0i16; n];
-    // thread_rng().fill(&mut s[..]);
-    // for val in s.iter_mut() { *val &= 0xF; }
-
-    // // init c [2^10]
-    // let n: usize = 1 << 20;
-    // let mut c: Vec<i16> = (0..n).map(|_| thread_rng().gen_range(0..16)).collect();
-
-    // // init z [2^13]
-    // let n: usize = 1 << 23;
-    // let mut z: Vec<i16> = vec![0; n];
-
-    // let start = Instant::now();
-    // // folding witness
-    // unsafe {
-    //     //fold_witness(&mut z, &c, &s);
-    //     memory_test(&mut z, &s);
+    // init c [2^10]
+    let n: usize = 1 << 20;
+    // let mut c_buf = vec![Align64([0i16; 32]); n / 32];
+    // let c = unsafe { std::slice::from_raw_parts_mut(c_buf.as_mut_ptr() as *mut i16, n) };
+    // for val in c.iter_mut() {
+    //     *val = thread_rng().gen_range(0..16);
     // }
-    // let fw_duration = start.elapsed();
-    // //println!("Folding witness: {:?}", fw_duration);
-    // println!("Memory test: {:?}", fw_duration);
+    let mut c: Vec<i16> = (0..n).map(|_| thread_rng().gen_range(0..16)).collect();
 
+    // init z [2^13]
+    let n: usize = 1 << 23;
+    // let mut z_buf = vec![Align64([0i16; 32]); n / 32];
+    // let mut z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i16, n) };
+    let mut z: Vec<i16> = vec![0; n];
 
-    // -----> FOLDING WITNESS JOLT <-----
-    let height = 16;
-    let dimention = 10;
-    let width = 8;
-    
-    // init s [height][width][dimention]
-    let n: usize = 1 << (height+width+dimention);
-
-    let mut s: Vec<u64> = vec![0u64; n];
-    sparse_random_1(&mut s);
-
-    // init c [height][dimention]
-    let n: usize = 1 << (height+dimention);
-    let m = (1i64 << 31) - 19;
-    let mut c: Vec<i32> = (0..n).map(|_| thread_rng().gen_range(0..m as i32)).collect();
-
-    // init z [width][dimention]
-    let n: usize = 1 << (width+dimention);
-    let mut z: Vec<i32> = vec![0; n];
-
-    
+    let start = Instant::now();
     // folding witness
     unsafe {
-        for i in 0..6{
-            let start = Instant::now();
-            fold_witness_jolt(&mut z, &c, &s, 1<<i);
-            let fwj_duration = start.elapsed();
-            println!("batch={:?}: {:?}", 1<<i, fwj_duration);
-        }
+        fold_witness(&mut z, &c, &s);
+        //memory_test(&mut z, &s);
     }
+    let fw_duration = start.elapsed();
+    println!("Folding witness: {:?}", fw_duration);
+    //println!("Memory test: {:?}", fw_duration);
+
+
+    // // -----> FOLDING WITNESS JOLT <-----
+    // let height = 16;
+    // let dimention = 10;
+    // let width = 8;
+    
+    // // init s [height][width][dimention]
+    // let n: usize = 1 << (height+width+dimention);
+
+    // let mut s: Vec<u64> = vec![0u64; n];
+    // sparse_random_1(&mut s);
+
+    // // init c [height][dimention]
+    // let n: usize = 1 << (height+dimention);
+    // let m = (1i64 << 31) - 19;
+    // let mut c: Vec<i32> = (0..n).map(|_| thread_rng().gen_range(0..m as i32)).collect();
+
+    // // init z [width][dimention]
+    // let n: usize = 1 << (width+dimention);
+    // let mut z: Vec<i32> = vec![0; n];
+
+    
+    // // folding witness
+    // unsafe {
+    //     for i in 0..6{
+    //         let start = Instant::now();
+    //         fold_witness_jolt(&mut z, &c, &s, 1<<i);
+    //         let fwj_duration = start.elapsed();
+    //         println!("batch={:?}: {:?}", 1<<i, fwj_duration);
+    //     }
+    // }
 
 
     // // -----> Commit <-----

@@ -14,15 +14,14 @@ fn mod_inverse(a: u64, m: u64) -> u64 {
 
 #[inline(always)]
 pub unsafe fn load_vec_to_m512(src: &[u32], offset: usize) -> __m512i {
-    // 使用 loadu (unaligned)，因為 Vec 的記憶體不保證 64-byte 對齊
     let ptr = src.as_ptr().add(offset) as *const __m512i;
-    _mm512_loadu_si512(ptr)
+    _mm512_load_si512(ptr)
 }
 
 #[inline(always)]
 pub unsafe fn store_m512_to_vec(src: __m512i, dst: &mut [u32], offset: usize) {
     let ptr = dst.as_mut_ptr().add(offset) as *mut __m512i;
-    _mm512_storeu_si512(ptr, src)
+    _mm512_store_si512(ptr, src)
 }
 
 pub fn generate_random_data_4bit(sz: usize, n: usize) -> Vec<u32> {
