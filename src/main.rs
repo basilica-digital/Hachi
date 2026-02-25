@@ -124,71 +124,75 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // println!("Core test: {:?}", duration);
 
 
-    // -----> FOLDING WITNESS <-----
-    // init s [2^13][2^10][2^10]
-    let n: usize = 1 << 33;
-    // let mut s_buf = vec![Align64([0i16; 32]); n / 32];
-    // let s = unsafe { std::slice::from_raw_parts_mut(s_buf.as_mut_ptr() as *mut i16, n) };
-    let mut s: Vec<i16> = vec![0i16; n];
-    thread_rng().fill(&mut s[..]);
-    for val in s.iter_mut() { *val &= 0xF; }
+    // // -----> FOLDING WITNESS <-----
+    // // init s [2^13][2^10][2^10]
+    // let n: usize = 1 << 33;
+    // // let mut s_buf = vec![Align64([0i16; 32]); n / 32];
+    // // let s = unsafe { std::slice::from_raw_parts_mut(s_buf.as_mut_ptr() as *mut i16, n) };
+    // let mut s: Vec<i16> = vec![0i16; n];
+    // thread_rng().fill(&mut s[..]);
+    // for val in s.iter_mut() { *val &= 0xF; }
 
-    // init c [2^10]
-    let n: usize = 1 << 20;
-    // let mut c_buf = vec![Align64([0i16; 32]); n / 32];
-    // let c = unsafe { std::slice::from_raw_parts_mut(c_buf.as_mut_ptr() as *mut i16, n) };
-    // for val in c.iter_mut() {
-    //     *val = thread_rng().gen_range(0..16);
-    // }
-    let mut c: Vec<i16> = (0..n).map(|_| thread_rng().gen_range(0..16)).collect();
+    // // init c [2^10]
+    // let n: usize = 1 << 20;
+    // // let mut c_buf = vec![Align64([0i16; 32]); n / 32];
+    // // let c = unsafe { std::slice::from_raw_parts_mut(c_buf.as_mut_ptr() as *mut i16, n) };
+    // // for val in c.iter_mut() {
+    // //     *val = thread_rng().gen_range(0..16);
+    // // }
+    // let mut c: Vec<i16> = (0..n).map(|_| thread_rng().gen_range(0..16)).collect();
 
-    // init z [2^13]
-    let n: usize = 1 << 23;
-    // let mut z_buf = vec![Align64([0i16; 32]); n / 32];
-    // let mut z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i16, n) };
-    let mut z: Vec<i16> = vec![0; n];
+    // // init z [2^13]
+    // let n: usize = 1 << 23;
+    // // let mut z_buf = vec![Align64([0i16; 32]); n / 32];
+    // // let mut z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i16, n) };
+    // let mut z: Vec<i16> = vec![0; n];
 
-    let start = Instant::now();
-    // folding witness
-    unsafe {
-        fold_witness(&mut z, &c, &s);
-        //memory_test(&mut z, &s);
-    }
-    let fw_duration = start.elapsed();
-    println!("Folding witness: {:?}", fw_duration);
-    //println!("Memory test: {:?}", fw_duration);
-
-
-    // // -----> FOLDING WITNESS JOLT <-----
-    // let height = 16;
-    // let dimention = 10;
-    // let width = 8;
-    
-    // // init s [height][width][dimention]
-    // let n: usize = 1 << (height+width+dimention);
-
-    // let mut s: Vec<u64> = vec![0u64; n];
-    // sparse_random_1(&mut s);
-
-    // // init c [height][dimention]
-    // let n: usize = 1 << (height+dimention);
-    // let m = (1i64 << 31) - 19;
-    // let mut c: Vec<i32> = (0..n).map(|_| thread_rng().gen_range(0..m as i32)).collect();
-
-    // // init z [width][dimention]
-    // let n: usize = 1 << (width+dimention);
-    // let mut z: Vec<i32> = vec![0; n];
-
-    
+    // let start = Instant::now();
     // // folding witness
     // unsafe {
-    //     for i in 0..6{
-    //         let start = Instant::now();
-    //         fold_witness_jolt(&mut z, &c, &s, 1<<i);
-    //         let fwj_duration = start.elapsed();
-    //         println!("batch={:?}: {:?}", 1<<i, fwj_duration);
-    //     }
+    //     fold_witness(&mut z, &c, &s);
+    //     //memory_test(&mut z, &s);
     // }
+    // let fw_duration = start.elapsed();
+    // println!("Folding witness: {:?}", fw_duration);
+    // //println!("Memory test: {:?}", fw_duration);
+
+
+    // -----> FOLDING WITNESS JOLT <-----
+    let height = 16;
+    let dimention = 10;
+    let width = 6;
+    
+    // init s [height][width][dimention]
+    let n_s: usize = 1 << (height + width + dimention);
+    let mut s_buf = vec![Align64([0u64; 8]); n_s / 8];
+    let s = unsafe { std::slice::from_raw_parts_mut(s_buf.as_mut_ptr() as *mut u64, n_s) };
+    sparse_random_1(s);
+
+    // init c [height][dimention]
+    let n_c: usize = 1 << (height + dimention);
+    let m = (1i64 << 31) - 19;
+    let mut c_buf = vec![Align64([0i32; 16]); n_c / 16];
+    let c = unsafe { std::slice::from_raw_parts_mut(c_buf.as_mut_ptr() as *mut i32, n_c) };
+    for val in c.iter_mut() {
+        *val = thread_rng().gen_range(0..m as i32);
+    }
+
+    // init z [width][dimention]
+    let n_z: usize = 1 << (width + dimention);
+    let mut z_buf = vec![Align64([0i32; 16]); n_z / 16];
+    let z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i32, n_z) };
+
+    // folding witness
+    unsafe {
+        for i in 0..6 {
+            let start = Instant::now();
+            fold_witness_jolt(z, c, s, 1 << i);
+            let fwj_duration = start.elapsed();
+            println!("batch={:?}: {:?}", 1 << i, fwj_duration);
+        }
+    }
 
 
     // // -----> Commit <-----
