@@ -104,6 +104,38 @@ pub unsafe fn ringmul(a: Vec<u32>, b: Vec<u32>) -> [u32; 1024] {
     c
 }
 
+pub unsafe fn ringmul_jolt(z: &mut [i32], a: &[i32], b: &[u8]) {
+    let mut tmp = [0i64; 2048];
+    
+    let m = (1i64 << 31) - 19;
+
+    for i in 0..4 {
+        let shift = b[i] as usize + i * 256;
+        for j in 0..1024 {
+            tmp[shift + j] += a[j] as i64;
+        }
+    }
+
+    for i in 0..1024 {
+        let res = (tmp[i] - tmp[i+1024]) % m;
+        z[i] = if res < 0 { (res + m) as i32 } else { res as i32 };
+    }
+}
+
+pub unsafe fn innerproduct_jolt(z: &mut [i32], c: &[i32], s: &[u8]){
+    for x in z.iter_mut() { *x = 0; }
+    let m = (1i64 << 31) - 19;
+    
+    for i in 0..(1<<16){
+        let mut tmp_z = [0i32; 1024];
+        ringmul_jolt(&mut tmp_z, &c[i*1024..(i+1)*1024], &s[i*4..(i+1)*4]);
+        for j in 0..1024 {
+            let res = (z[j] as i64 + tmp_z[j] as i64) % m;
+            z[j] = if res < 0 { (res + m) as i32 } else { res as i32 };
+        }
+    }
+}
+
 
 
 fn main()-> Result<(), Box<dyn std::error::Error>>{
@@ -162,13 +194,13 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // -----> FOLDING WITNESS JOLT <-----
     let height = 16;
     let dimention = 10;
-    let width = 6;
+    let width = 10;
+    let size_csv = format!("2^{}*2^{}", height, width);
     
     // init s [height][width][dimention]
-    let n_s: usize = 1 << (height + width + dimention);
-    let mut s_buf = vec![Align64([0u64; 8]); n_s / 8];
-    let s = unsafe { std::slice::from_raw_parts_mut(s_buf.as_mut_ptr() as *mut u64, n_s) };
-    sparse_random_1(s);
+    let n_s: usize = 1 << (height + width + 4);
+    let mut s = vec![0u8; n_s];
+    sparse_random_1_index(&mut s);
 
     // init c [height][dimention]
     let n_c: usize = 1 << (height + dimention);
@@ -184,15 +216,25 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     let mut z_buf = vec![Align64([0i32; 16]); n_z / 16];
     let z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i32, n_z) };
 
+    // test z
+    let mut z_test = vec![0i32; n_z];
+
     // folding witness
     unsafe {
-        for i in 0..6 {
-            let start = Instant::now();
-            fold_witness_jolt(z, c, s, 1 << i);
-            let fwj_duration = start.elapsed();
-            println!("batch={:?}: {:?}", 1 << i, fwj_duration);
-        }
+        let start = Instant::now();
+        fold_witness_jolt_4(z, c, &s);
+        let fwj_duration = start.elapsed();
+        println!("CSV_RESULT: 4,{},{:?}", size_csv, fwj_duration);
+        // fold_witness_jolt(z, c, &s, 1);
+        // for i in 0..(n_z / 1024) {
+        //     innerproduct_jolt(&mut z_test[i*1024..(i+1)*1024], &c, &s[i*((1<<18))..]);
+        // }
     }
+
+    // // test z
+    // for i in 0..n_z{
+    //     assert_eq!(z[i], z_test[i]);
+    // }
 
 
     // // -----> Commit <-----

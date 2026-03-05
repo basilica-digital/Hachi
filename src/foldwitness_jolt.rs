@@ -1,3 +1,4 @@
+#[inline(always)]
 pub unsafe fn jolt_mod_q(out: &mut [i32; 8], x: __m512i) {
     let mask32 = _mm512_set1_epi64(0xFFFFFFFF_i64);
     let mask31 = _mm512_set1_epi64(0x7FFFFFFF_i64);
@@ -23,7 +24,7 @@ pub unsafe fn jolt_mod_q(out: &mut [i32; 8], x: __m512i) {
     let cmp = _mm512_cmp_epu64_mask(w, q_vec, 5);
     let result_64 = _mm512_mask_sub_epi64(w, cmp, w, q_vec);
     let result_32 = _mm512_cvtepi64_epi32(result_64);
-    *out = std::mem::transmute::<__m256i, [i32; 8]>(result_32);
+    _mm256_storeu_si256(out.as_mut_ptr() as *mut __m256i, result_32);
 }
 
 pub unsafe fn sparse_poly_index_jolt(id:&mut [u8], c: &[u64]){
@@ -39,132 +40,165 @@ pub unsafe fn sparse_poly_index_jolt(id:&mut [u8], c: &[u64]){
 }
 
 #[inline(always)]
-pub unsafe fn fold_witness_row_jolt(z: &mut [i32], id: &[u8], c: &[i32], batch: usize){
-    let mut res: Vec<[[__m512i; 256]; 8]> = vec![[[_mm512_setzero_si512(); 256]; 8]; batch];
-    let c_ptr = c.as_ptr() as *const __m256i;
-    // inner product
-    for i in 0..(1<<16){
-        // id
-        for j in 0..4{
-            // c 
-            for k in 0..128{
-                let v256 = _mm256_load_si256(c_ptr.add(i*128 + k));
-                let c_vec = _mm512_cvtepi32_epi64(v256);
-                // batch 
-                for l in 0..batch{
-                    let offset = id[l*(1<<18)+i*4+j] as usize;
-                    let channel = offset % 8;
-                    let base_idx = (offset / 8) + j*32;
-                    res[l][channel][base_idx + k] = _mm512_add_epi64(c_vec, res[l][channel][base_idx + k]);
-                }
-            }
+pub unsafe fn fold_witness_row_jolt_4(z: &mut [i32], id: &[u8], c: &[i32]) {
+    const batch: usize = 4;
+    // batch_stride = 257*8;
+    
+    let mut res = vec![_mm512_setzero_si512(); 8224];
+    let res_ptr = res.as_mut_ptr();
+    let c_ptr = c.as_ptr() as *const i32;
+    let id_ptr = id.as_ptr();
+
+    let mut lookuptable = [0u16; 256];
+    for j in 0..256 {
+        lookuptable[j] = ((j&7)*257 + (j>>3)) as u16;
+    }
+
+    for i in 0..(1 << 16) {
+        let r = i*4;
+        let row_c_ptr = c_ptr.add(i*1024);
+        let mut p_stack = [std::ptr::null_mut::<__m512i>(); 16];
+
+        for l in 0..4 {
+            let ids_u32 = *(id_ptr.add((l << 18) + r) as *const u32);
+            let b_off = l*2056;
+
+            let j0 = (ids_u32 & 0xFF) as usize;
+            let j1 = ((ids_u32 >> 8) & 0xFF) as usize;
+            let j2 = ((ids_u32 >> 16) & 0xFF) as usize;
+            let j3 = (ids_u32 >> 24) as usize;
+
+            p_stack[l*4+0] = res_ptr.add(b_off + lookuptable[j0] as usize);
+            p_stack[l*4+1] = res_ptr.add(b_off + lookuptable[j1] as usize + 32);
+            p_stack[l*4+2] = res_ptr.add(b_off + lookuptable[j2] as usize + 64);
+            p_stack[l*4+3] = res_ptr.add(b_off + lookuptable[j3] as usize + 96);
+        }
+
+        for k in (0..128).step_by(2) {
+            let v512 = _mm512_loadu_si512(row_c_ptr.add(k * 8) as *const __m512i);
+            let cv0 = _mm512_cvtepi32_epi64(_mm512_castsi512_si256(v512));
+            let cv1 = _mm512_cvtepi32_epi64(_mm512_extracti64x4_epi64::<1>(v512));
+            
+            // 1
+            let p0 = p_stack[0].add(k);
+            let p1 = p_stack[1].add(k);
+            let p2 = p_stack[2].add(k);
+            let p3 = p_stack[3].add(k);
+            *p0 = _mm512_add_epi64(cv0, *p0);
+            *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
+            *p1 = _mm512_add_epi64(cv0, *p1);
+            *(p1.add(1)) = _mm512_add_epi64(cv1, *(p1.add(1)));
+            *p2 = _mm512_add_epi64(cv0, *p2);
+            *(p2.add(1)) = _mm512_add_epi64(cv1, *(p2.add(1)));
+            *p3 = _mm512_add_epi64(cv0, *p3);
+            *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
+            
+            // 2
+            let p0 = p_stack[4].add(k);
+            let p1 = p_stack[5].add(k);
+            let p2 = p_stack[6].add(k);
+            let p3 = p_stack[7].add(k);
+            *p0 = _mm512_add_epi64(cv0, *p0);
+            *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
+            *p1 = _mm512_add_epi64(cv0, *p1);
+            *(p1.add(1)) = _mm512_add_epi64(cv1, *(p1.add(1)));
+            *p2 = _mm512_add_epi64(cv0, *p2);
+            *(p2.add(1)) = _mm512_add_epi64(cv1, *(p2.add(1)));
+            *p3 = _mm512_add_epi64(cv0, *p3);
+            *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
+            
+            // 3
+            let p0 = p_stack[8].add(k);
+            let p1 = p_stack[9].add(k);
+            let p2 = p_stack[10].add(k);
+            let p3 = p_stack[11].add(k);
+            *p0 = _mm512_add_epi64(cv0,*p0);
+            *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
+            *p1 = _mm512_add_epi64(cv0, *p1);
+            *(p1.add(1)) = _mm512_add_epi64(cv1, *(p1.add(1)));
+            *p2 = _mm512_add_epi64(cv0, *p2);
+            *(p2.add(1)) = _mm512_add_epi64(cv1, *(p2.add(1)));
+            *p3 = _mm512_add_epi64(cv0, *p3);
+            *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
+            
+            // 4
+            let p0 = p_stack[12].add(k);
+            let p1 = p_stack[13].add(k);
+            let p2 = p_stack[14].add(k);
+            let p3 = p_stack[15].add(k);
+            *p0 = _mm512_add_epi64(cv0, *p0);
+            *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
+            *p1 = _mm512_add_epi64(cv0, *p1);
+            *(p1.add(1)) = _mm512_add_epi64(cv1, *(p1.add(1)));
+            *p2 = _mm512_add_epi64(cv0, *p2);
+            *(p2.add(1)) = _mm512_add_epi64(cv1, *(p2.add(1)));
+            *p3 = _mm512_add_epi64(cv0, *p3);
+            *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
+        
         }
     }
-    // merge res
-    for i in 0..batch{
-        let mut prev_1 = _mm512_setzero_si512();
-        let mut prev_2 = _mm512_setzero_si512();
-        let mut prev_3 = _mm512_setzero_si512();
-        let mut prev_4 = _mm512_setzero_si512();
-        let mut prev_5 = _mm512_setzero_si512();
-        let mut prev_6 = _mm512_setzero_si512();
-        let mut prev_7 = _mm512_setzero_si512();
+    const BIN_SIZE: usize = 257;
+    // merge
+    for i in 0..batch {
+        let b_off = i*2056;
+        let mut p1 = _mm512_setzero_si512(); let mut p2 = _mm512_setzero_si512();
+        let mut p3 = _mm512_setzero_si512(); let mut p4 = _mm512_setzero_si512();
+        let mut p5 = _mm512_setzero_si512(); let mut p6 = _mm512_setzero_si512();
+        let mut p7 = _mm512_setzero_si512();
 
         for k in 0..128 {
-            let mut acc = res[i][0][k];
-            
-            // j = 1, shift left by 1 element (64 bits), extract starting from 8-1 = 7
-            let c1 = res[i][1][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<7>(c1, prev_1));
-            prev_1 = c1;
+            let mut acc = *res_ptr.add(b_off + 0 * BIN_SIZE + k);
+            let c1 = *res_ptr.add(b_off + 1 * BIN_SIZE + k);
+            let c2 = *res_ptr.add(b_off + 2 * BIN_SIZE + k);
+            let c3 = *res_ptr.add(b_off + 3 * BIN_SIZE + k);
+            let c4 = *res_ptr.add(b_off + 4 * BIN_SIZE + k);
+            let c5 = *res_ptr.add(b_off + 5 * BIN_SIZE + k);
+            let c6 = *res_ptr.add(b_off + 6 * BIN_SIZE + k);
+            let c7 = *res_ptr.add(b_off + 7 * BIN_SIZE + k);
 
-            // j = 2, extract starting from 8-2 = 6
-            let c2 = res[i][2][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<6>(c2, prev_2));
-            prev_2 = c2;
-
-            // j = 3, extract starting from 8-3 = 5
-            let c3 = res[i][3][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<5>(c3, prev_3));
-            prev_3 = c3;
-
-            // j = 4, extract starting from 8-4 = 4
-            let c4 = res[i][4][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<4>(c4, prev_4));
-            prev_4 = c4;
-
-            // j = 5, extract starting from 8-5 = 3
-            let c5 = res[i][5][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<3>(c5, prev_5));
-            prev_5 = c5;
-
-            // j = 6, extract starting from 8-6 = 2
-            let c6 = res[i][6][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<2>(c6, prev_6));
-            prev_6 = c6;
-
-            // j = 7, extract starting from 8-7 = 1
-            let c7 = res[i][7][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<1>(c7, prev_7));
-            prev_7 = c7;
-            res[i][0][k] = acc;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<7>(c1, p1)); p1 = c1;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<6>(c2, p2)); p2 = c2;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<5>(c3, p3)); p3 = c3;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<4>(c4, p4)); p4 = c4;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<3>(c5, p5)); p5 = c5;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<2>(c6, p6)); p6 = c6;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<1>(c7, p7)); p7 = c7;
+            *res_ptr.add(b_off + 0 * BIN_SIZE + k) = acc;
         }
 
         for k in 128..256 {
-            let mut acc = res[i][0][k];
-            
-            // j = 1, shift left by 1 element (64 bits), extract starting from 8-1 = 7
-            let c1 = res[i][1][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<7>(c1, prev_1));
-            prev_1 = c1;
+            let mut acc = *res_ptr.add(b_off + 0 * BIN_SIZE + k);
+            let c1 = *res_ptr.add(b_off + 1 * BIN_SIZE + k);
+            let c2 = *res_ptr.add(b_off + 2 * BIN_SIZE + k);
+            let c3 = *res_ptr.add(b_off + 3 * BIN_SIZE + k);
+            let c4 = *res_ptr.add(b_off + 4 * BIN_SIZE + k);
+            let c5 = *res_ptr.add(b_off + 5 * BIN_SIZE + k);
+            let c6 = *res_ptr.add(b_off + 6 * BIN_SIZE + k);
+            let c7 = *res_ptr.add(b_off + 7 * BIN_SIZE + k);
 
-            // j = 2, extract starting from 8-2 = 6
-            let c2 = res[i][2][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<6>(c2, prev_2));
-            prev_2 = c2;
-
-            // j = 3, extract starting from 8-3 = 5
-            let c3 = res[i][3][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<5>(c3, prev_3));
-            prev_3 = c3;
-
-            // j = 4, extract starting from 8-4 = 4
-            let c4 = res[i][4][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<4>(c4, prev_4));
-            prev_4 = c4;
-
-            // j = 5, extract starting from 8-5 = 3
-            let c5 = res[i][5][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<3>(c5, prev_5));
-            prev_5 = c5;
-
-            // j = 6, extract starting from 8-6 = 2
-            let c6 = res[i][6][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<2>(c6, prev_6));
-            prev_6 = c6;
-
-            // j = 7, extract starting from 8-7 = 1
-            let c7 = res[i][7][k];
-            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<1>(c7, prev_7));
-            prev_7 = c7;
-            res[i][0][k-128] = _mm512_sub_epi64(res[i][0][k-128], acc);
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<7>(c1, p1)); p1 = c1;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<6>(c2, p2)); p2 = c2;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<5>(c3, p3)); p3 = c3;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<4>(c4, p4)); p4 = c4;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<3>(c5, p5)); p5 = c5;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<2>(c6, p6)); p6 = c6;
+            acc = _mm512_add_epi64(acc, _mm512_alignr_epi64::<1>(c7, p7)); p7 = c7;
+            let target_ptr = res_ptr.add(b_off + 0 * BIN_SIZE + (k - 128));
+            *target_ptr = _mm512_sub_epi64(*target_ptr, acc);
         }
-    }
-    for j in 0..batch {
-        for i in 0..128{
-            jolt_mod_q((&mut z[j*1024+i*8..j*1024+i*8+8]).try_into().unwrap(), res[j][0][i]);
+
+        let offset_q = _mm512_set1_epi64(((1i64 << 31) - 19) << 19);
+        let z_base_ptr = z.as_mut_ptr().add(i * 1024);
+        for k in 0..128 {
+            let val = _mm512_add_epi64(*res_ptr.add(b_off + 0 * BIN_SIZE + k), offset_q);
+            jolt_mod_q(&mut *(z_base_ptr.add(k * 8) as *mut [i32; 8]), val);
         }
     }
 }
 
 #[inline(never)]
-pub unsafe fn fold_witness_jolt(z: &mut [i32], c: &[i32], s: &[u64], batch: usize) {
-    // id size: 2 + 16 + 6
-    let mut id = vec![0u8; (1<<24)];
-    id.par_chunks_mut(4).enumerate().for_each(|(i, id_slice)| {
-        sparse_poly_index_jolt(id_slice, &s[16 * i..]);
-    });
-    z.par_chunks_mut((1 << 10)*batch).enumerate().for_each(|(i, z_row)| {
-        fold_witness_row_jolt(z_row, &id[i*((1<<18)*batch)..], c, batch);
+pub unsafe fn fold_witness_jolt_4(z: &mut [i32], c: &[i32], s: &[u8]) {
+    z.par_chunks_mut(1 << 12).enumerate().for_each(|(i, z_row)| {
+        fold_witness_row_jolt_4(z_row, &s[i*((1<<20))..], c);
     });
 }
