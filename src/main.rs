@@ -137,7 +137,7 @@ pub unsafe fn innerproduct_jolt(z: &mut [i32], c: &[i32], s: &[u8]){
 }
 
 
-
+#[allow(non_snake_case)]
 fn main()-> Result<(), Box<dyn std::error::Error>>{
 
     // // // -----> TEST NUM CORES <-----
@@ -191,45 +191,45 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // //println!("Memory test: {:?}", fw_duration);
 
 
-    // -----> FOLDING WITNESS JOLT <-----
-    let height = 16;
-    let dimention = 10;
-    let width = 10;
-    let size_csv = format!("2^{}*2^{}", height, width);
+    // // -----> FOLDING WITNESS JOLT <-----
+    // let height = 16;
+    // let dimention = 10;
+    // let width = 10;
+    // let size_csv = format!("2^{}*2^{}", height, width);
     
-    // init s [height][width][dimention]
-    let n_s: usize = 1 << (height + width + 4);
-    let mut s = vec![0u8; n_s];
-    sparse_random_1_index(&mut s);
+    // // init s [height][width][dimention]
+    // let n_s: usize = 1 << (height + width + 4);
+    // let mut s = vec![0u8; n_s];
+    // sparse_random_1_index(&mut s);
 
-    // init c [height][dimention]
-    let n_c: usize = 1 << (height + dimention);
-    let m = (1i64 << 31) - 19;
-    let mut c_buf = vec![Align64([0i32; 16]); n_c / 16];
-    let c = unsafe { std::slice::from_raw_parts_mut(c_buf.as_mut_ptr() as *mut i32, n_c) };
-    for val in c.iter_mut() {
-        *val = thread_rng().gen_range(0..m as i32);
-    }
+    // // init c [height][dimention]
+    // let n_c: usize = 1 << (height + dimention);
+    // let m = (1i64 << 31) - 19;
+    // let mut c_buf = vec![Align64([0i32; 16]); n_c / 16];
+    // let c = unsafe { std::slice::from_raw_parts_mut(c_buf.as_mut_ptr() as *mut i32, n_c) };
+    // for val in c.iter_mut() {
+    //     *val = thread_rng().gen_range(0..m as i32);
+    // }
 
-    // init z [width][dimention]
-    let n_z: usize = 1 << (width + dimention);
-    let mut z_buf = vec![Align64([0i32; 16]); n_z / 16];
-    let z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i32, n_z) };
+    // // init z [width][dimention]
+    // let n_z: usize = 1 << (width + dimention);
+    // let mut z_buf = vec![Align64([0i32; 16]); n_z / 16];
+    // let z = unsafe { std::slice::from_raw_parts_mut(z_buf.as_mut_ptr() as *mut i32, n_z) };
 
-    // test z
-    let mut z_test = vec![0i32; n_z];
+    // // test z
+    // let mut z_test = vec![0i32; n_z];
 
-    // folding witness
-    unsafe {
-        let start = Instant::now();
-        fold_witness_jolt_4(z, c, &s);
-        let fwj_duration = start.elapsed();
-        println!("CSV_RESULT: 4,{},{:?}", size_csv, fwj_duration);
-        // fold_witness_jolt(z, c, &s, 1);
-        // for i in 0..(n_z / 1024) {
-        //     innerproduct_jolt(&mut z_test[i*1024..(i+1)*1024], &c, &s[i*((1<<18))..]);
-        // }
-    }
+    // // folding witness
+    // unsafe {
+    //     let start = Instant::now();
+    //     fold_witness_jolt_4(z, c, &s);
+    //     let fwj_duration = start.elapsed();
+    //     println!("CSV_RESULT: 4,{},{:?}", size_csv, fwj_duration);
+    //     // fold_witness_jolt(z, c, &s, 1);
+    //     // for i in 0..(n_z / 1024) {
+    //     //     innerproduct_jolt(&mut z_test[i*1024..(i+1)*1024], &c, &s[i*((1<<18))..]);
+    //     // }
+    // }
 
     // // test z
     // for i in 0..n_z{
@@ -313,6 +313,10 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     //         }
     //     }
     // }
-    
+
+    // // -----> Sumcheck <-----
+    sumcheck();
+
+
     Ok(())
 }

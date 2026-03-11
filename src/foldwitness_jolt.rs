@@ -74,18 +74,35 @@ pub unsafe fn fold_witness_row_jolt_4(z: &mut [i32], id: &[u8], c: &[i32]) {
             p_stack[l*4+3] = res_ptr.add(b_off + lookuptable[j3] as usize + 96);
         }
 
+        let p00 = p_stack[0];
+        let p01 = p_stack[1];
+        let p02 = p_stack[2];
+        let p03 = p_stack[3];
+        let p04 = p_stack[4];
+        let p05 = p_stack[5];
+        let p06 = p_stack[6];
+        let p07 = p_stack[7];
+        let p08 = p_stack[8];
+        let p09 = p_stack[9];
+        let p010 = p_stack[10];
+        let p011 = p_stack[11];
+        let p012 = p_stack[12];
+        let p013 = p_stack[13];
+        let p014 = p_stack[14];
+        let p015 = p_stack[15];
+
         for k in (0..128).step_by(2) {
             let v512 = _mm512_loadu_si512(row_c_ptr.add(k * 8) as *const __m512i);
             let cv0 = _mm512_cvtepi32_epi64(_mm512_castsi512_si256(v512));
             let cv1 = _mm512_cvtepi32_epi64(_mm512_extracti64x4_epi64::<1>(v512));
             
             // 1
-            let p0 = p_stack[0].add(k);
-            let p1 = p_stack[1].add(k);
-            let p2 = p_stack[2].add(k);
-            let p3 = p_stack[3].add(k);
+            let p0 = p00.add(k);
+            let p1 = p01.add(k);
+            let p2 = p02.add(k);
+            let p3 = p03.add(k);
             *p0 = _mm512_add_epi64(cv0, *p0);
-            *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
+            *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(k+1)));
             *p1 = _mm512_add_epi64(cv0, *p1);
             *(p1.add(1)) = _mm512_add_epi64(cv1, *(p1.add(1)));
             *p2 = _mm512_add_epi64(cv0, *p2);
@@ -94,10 +111,10 @@ pub unsafe fn fold_witness_row_jolt_4(z: &mut [i32], id: &[u8], c: &[i32]) {
             *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
             
             // 2
-            let p0 = p_stack[4].add(k);
-            let p1 = p_stack[5].add(k);
-            let p2 = p_stack[6].add(k);
-            let p3 = p_stack[7].add(k);
+            let p0 = p04.add(k);
+            let p1 = p05.add(k);
+            let p2 = p06.add(k);
+            let p3 = p07.add(k);
             *p0 = _mm512_add_epi64(cv0, *p0);
             *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
             *p1 = _mm512_add_epi64(cv0, *p1);
@@ -108,10 +125,10 @@ pub unsafe fn fold_witness_row_jolt_4(z: &mut [i32], id: &[u8], c: &[i32]) {
             *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
             
             // 3
-            let p0 = p_stack[8].add(k);
-            let p1 = p_stack[9].add(k);
-            let p2 = p_stack[10].add(k);
-            let p3 = p_stack[11].add(k);
+            let p0 = p08.add(k);
+            let p1 = p09.add(k);
+            let p2 = p010.add(k);
+            let p3 = p011.add(k);
             *p0 = _mm512_add_epi64(cv0,*p0);
             *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
             *p1 = _mm512_add_epi64(cv0, *p1);
@@ -122,10 +139,10 @@ pub unsafe fn fold_witness_row_jolt_4(z: &mut [i32], id: &[u8], c: &[i32]) {
             *(p3.add(1)) = _mm512_add_epi64(cv1, *(p3.add(1)));
             
             // 4
-            let p0 = p_stack[12].add(k);
-            let p1 = p_stack[13].add(k);
-            let p2 = p_stack[14].add(k);
-            let p3 = p_stack[15].add(k);
+            let p0 = p012.add(k);
+            let p1 = p013.add(k);
+            let p2 = p014.add(k);
+            let p3 = p015.add(k);
             *p0 = _mm512_add_epi64(cv0, *p0);
             *(p0.add(1)) = _mm512_add_epi64(cv1, *(p0.add(1)));
             *p1 = _mm512_add_epi64(cv0, *p1);
