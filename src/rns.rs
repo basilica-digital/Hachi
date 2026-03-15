@@ -47,9 +47,6 @@ mod tests {
             unsafe {
                 let q1: u64 = 759207937;
                 let q2: u64 = 759304193;
-                
-                
-                // 測試測資 1
                 let secret_val: u64 = 2885016803;
                 let a = (secret_val % q1) as u32;
                 let b = (secret_val % q2) as u32;
@@ -59,16 +56,13 @@ mod tests {
 
                 println!("q1:{}, q2:{}", res % q1, res % q2);
 
-                // 驗證是否拼回原始值 (在 mod q1*q2 下)
-                // 如果 secret_val < 2^32，res 應該直接等於 secret_val
-                assert_eq!(res % q1, a as u64, "q1 剩餘不符");
-                assert_eq!(res % q2, b as u64, "q2 剩餘不符");
+                assert_eq!(res % q1, a as u64, "q1 failed");
+                assert_eq!(res % q2, b as u64, "q2 failed");
 
-                // 大規模隨機測試
                 let mut seed: u32 = 0xABCDE;
                 for _ in 0..100000 {
                     seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
-                    let test_val = seed as u64; // 隨機產生一個 32-bit 範圍內的數
+                    let test_val = seed as u64;
                     
                     let a_simd = (test_val % q1) as u32;
                     let b_simd = (test_val % q2) as u32;
@@ -77,11 +71,11 @@ mod tests {
                     let actual = get_first_u32(v_res) as u64;
                     
                     if actual % q1 != a_simd as u64 || actual % q2 != b_simd as u64 {
-                        panic!("驗證失敗！原始值: {}, 得到的 a: {}, b: {}, 恢復值: {}", 
+                        panic!("Failed, Original: {}, a: {}, b: {}, Recovered: {}", 
                                test_val, a_simd, b_simd, actual);
                     }
                 }
-                println!("✅ 100,000 組 IRNS 隨機測試通過！");
+                println!("IRNS passed");
             }
         }
     }

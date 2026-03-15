@@ -20,6 +20,7 @@ use rayon::prelude::*;
 
 use crate::fields::fields::*;
 include!("macro.rs");
+// include!("sumcheck.rs");
 include!("rns.rs");
 include!("foldwitness.rs");
 include!("foldwitness_jolt.rs");
@@ -237,86 +238,140 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // }
 
 
-    // // -----> Commit <-----
-    // let start = Instant::now();
-    // let n = 1 << 10;
-    // let iterations = 1 << 10;
-    // let height = 1 << 13;
-    // let sz = 1 << 23;
-    // let s = &mut generate_random_data_4bit(sz, n);
-    // let acap1 = &mut generate_random_data_30bit(height, n);
-    // let acap2 = &mut generate_random_data_30bit(height, n);
-    // let mut u = vec![0u32; n];
-    
-    // let init_duration = start.elapsed();
+    // -----> Commit <-----
+    let n = 1 << 10;
+    let height = 1 << 13;
+    let sz = 1 << 20;
+    let s = &mut generate_random_data_32bit(sz, n);
+    let acap = &mut generate_random_data_32bit(height, n);
+    let bcap = &mut generate_random_data_32bit(height, n);
+    let mut u = Align64([0u32; 1024]);
 
-    // println!("Init: {:?}", init_duration);
-    // let start = Instant::now();
-    // unsafe{
-    //     commit(&mut u, s, acap1, acap2);
-    // }
-    // let commit_duration = start.elapsed();
-    // println!("Commit: {:?}", commit_duration);
-
-    // // -----> Ring multiplication test <-----
-    // // let file = File::create("out.txt")?;
-    // // let mut writer = BufWriter::new(file);
-    // unsafe{
-    //     let n = 1 << 10;
-    //     let moduli = [759207937, 759304193];
-    //     let plans: Vec<Plan> = moduli.iter().map(|&q| Plan::try_new(n, q).unwrap()).collect();
-
-    //     let random_ring = &mut generate_random_data_30bit(1, n);
-    //     let small_ring = &mut generate_random_data_4bit(1, n);
-        
-    //     let mut r1:[u32;1024] = random_ring[0..1024].try_into().expect("Slice length mismatch");
-    //     let mut r2:[u32;1024] = random_ring[0..1024].try_into().expect("Slice length mismatch");
-    //     let mut s1:[u32;1024] = small_ring[0..1024].try_into().expect("Slice length mismatch");
-    //     let mut s2:[u32;1024] = small_ring[0..1024].try_into().expect("Slice length mismatch");
-    //     let mut u = vec![0u32; n];
-    //     let u_ptr = u.as_mut_ptr() as *mut __m512i;
-    //     let mut v1 = [_mm512_set1_epi32(0); 64];
-    //     let mut v1_ptr = std::slice::from_raw_parts(v1.as_ptr() as *const u32, 1024);
-    //     let mut v2 = [_mm512_set1_epi32(0); 64];
-    //     let mut v2_ptr = std::slice::from_raw_parts(v2.as_ptr() as *const u32, 1024);
-        
-    //     plans[0].fwd(&mut s1);
-    //     plans[1].fwd(&mut s2);
-    //     plans[0].fwd(&mut r1);
-    //     plans[1].fwd(&mut r2);
-        
-        
-    //     let s1_ptr = s1.as_mut_ptr() as *mut __m512i;
-    //     let s2_ptr = s2.as_mut_ptr() as *mut __m512i;
-    //     let capa1_ptr = r1.as_mut_ptr() as *mut __m512i;
-    //     let capa2_ptr = r2.as_mut_ptr() as *mut __m512i;
-    //     for k in 0..64{
-    //         let s1_vec = _mm512_loadu_si512(s1_ptr.add(k));
-    //         let s2_vec = _mm512_loadu_si512(s2_ptr.add(k));
-    //         let a1_vec = _mm512_loadu_si512(capa1_ptr.add(k));
-    //         let a2_vec = _mm512_loadu_si512(capa2_ptr.add(k));
-    //         v1[k] = simple_mul_mod_759207937(s1_vec, a1_vec);//montproduct_759207937(s1_vec, a1_vec);
-    //         v2[k] = simple_mul_mod_759304193(s2_vec, a2_vec);//montproduct_759304193(s2_vec, a2_vec);
-    //     }
-        
-    //     plans[0].inv(slice::from_raw_parts_mut(v1.as_mut_ptr() as *mut u32, 1024));
-    //     plans[1].inv(slice::from_raw_parts_mut(v2.as_mut_ptr() as *mut u32, 1024));    
-    //     irns(&v1, &v2, u_ptr, 0);
-
-    //     let m = (1u64 << 32) - 99;
-
-    //     let u_ref = ringmul(small_ring.to_vec(), random_ring.to_vec());
-
-    //     for i in 0..1024 {
-    //         if (u_ref[i] as u64) % m != (u[i] as u64) % m {
-    //             println!("Failed at index {}: expected {}, got {}", i, (u_ref[i] as u64) % m, (u[i] as u64) % m);
-    //         }
-    //     }
-    // }
+    let start = Instant::now();
+    unsafe{
+        commit(&mut u.0, s, acap, bcap);
+    }
+    let commit_duration = start.elapsed();
+    println!("Commit: {:?}", commit_duration);
 
     // // -----> Sumcheck <-----
-    sumcheck();
+    // sumcheck();
 
 
     Ok(())
+}
+
+#[cfg(test)]
+mod ring_tests {
+    use super::*;
+    use std::arch::x86_64::*;
+    unsafe fn ring_inner_product_ref(s: &[u32], a: &[u32], height: usize, n: usize) -> Vec<u32> {
+        let mut acc = vec![0u64; n];
+        let m = (1u64 << 32) - 99; // Goldilocks prime
+        
+        for j in 0..height {
+            let s_poly = &s[j * n .. (j + 1) * n];
+            let a_poly = &a[j * n .. (j + 1) * n];
+            let prod = unsafe {ringmul(s_poly.to_vec(), a_poly.to_vec())}; 
+            for i in 0..n {
+                acc[i] = (acc[i] + prod[i] as u64) % m;
+            }
+        }
+        acc.into_iter().map(|x| x as u32).collect()
+    }
+
+    #[test]
+    fn test_ring_inner_product() {
+        unsafe {
+            let n = 1 << 10; // 1024
+            let height = 1<<13; // 8192
+            let moduli = [759207937, 759304193];
+            
+            let q1 = _mm512_set1_epi32(759207937);
+            let q1_inv = _mm512_set1_epi32(754935809);
+            let q2 = _mm512_set1_epi32(759304193);
+            let q2_inv = _mm512_set1_epi32(331214849);
+            
+            let plans: Vec<Plan> = moduli.iter().map(|&q| Plan::try_new(n, q).unwrap()).collect();
+            let random_ring = generate_random_data_32bit(height, n);
+            let small_ring = generate_random_data_4bit(height, n);
+            
+            let mut u = vec![0u32; n];
+            let u_ptr = u.as_mut_ptr() as *mut __m512i;
+            
+            let mut v1 = [_mm512_set1_epi32(0); 64];
+            let mut v2 = [_mm512_set1_epi32(0); 64];
+
+            for j in 0..height {
+                let s_slice = &small_ring[j * n .. (j + 1) * n];
+                let a_slice = &random_ring[j * n .. (j + 1) * n];
+
+                let mut a1 = Align64([0u32; 1024]);
+                let mut a2 = Align64([0u32; 1024]);
+                let mut s1 = Align64([0u32; 1024]);
+                let mut s2 = Align64([0u32; 1024]);
+
+                // RNS Decompose A
+                for k in (0..1024).step_by(16) {
+                    rns_decompose_16_elements(
+                        a_slice,
+                        &mut a1.0,
+                        &mut a2.0, 
+                        k
+                    );
+                }
+                s1.0.copy_from_slice(s_slice);
+                s2.0.copy_from_slice(s_slice);
+                plans[0].fwd(&mut a1.0);
+                plans[1].fwd(&mut a2.0);
+                plans[0].fwd(&mut s1.0);
+                plans[1].fwd(&mut s2.0);
+
+                let s1_ptr = s1.0.as_ptr() as *const __m512i;
+                let s2_ptr = s2.0.as_ptr() as *const __m512i;
+                let a1_ptr = a1.0.as_ptr() as *const __m512i;
+                let a2_ptr = a2.0.as_ptr() as *const __m512i;
+
+                for k in 0..64 {
+                    let s1_vec = _mm512_load_si512(s1_ptr.add(k));
+                    let a1_vec = _mm512_load_si512(a1_ptr.add(k));
+                    let p1 = montproduct_759207937(s1_vec, a1_vec, q1, q1_inv);
+                    
+                    let s2_vec = _mm512_load_si512(s2_ptr.add(k));
+                    let a2_vec = _mm512_load_si512(a2_ptr.add(k));
+                    let p2 = montproduct_759304193(s2_vec, a2_vec, q2, q2_inv);
+                    
+                    let sum1 = _mm512_add_epi32(v1[k], p1);
+                    let ge_q1 = _mm512_cmpge_epu32_mask(sum1, q1);
+                    v1[k] = _mm512_mask_sub_epi32(sum1, ge_q1, sum1, q1);
+
+                    let sum2 = _mm512_add_epi32(v2[k], p2);
+                    let ge_q2 = _mm512_cmpge_epu32_mask(sum2, q2);
+                    v2[k] = _mm512_mask_sub_epi32(sum2, ge_q2, sum2, q2);
+                }
+            }
+            for k in 0..64 {
+                v1[k] = barrett_mul_4194304_759207937(v1[k]);
+                v2[k] = barrett_mul_4194304_759304193(v2[k]);
+            }
+            plans[0].inv(std::slice::from_raw_parts_mut(v1.as_mut_ptr() as *mut u32, 1024));
+            plans[1].inv(std::slice::from_raw_parts_mut(v2.as_mut_ptr() as *mut u32, 1024));
+            irns(&v1, &v2, u_ptr, 0);
+            let m = (1u64 << 32) - 99;
+            let u_ref = ring_inner_product_ref(&small_ring, &random_ring, height, n);
+
+            let mut all_match = true;
+            for i in 0..1024 {
+                let expected = (u_ref[i] as u64) % m;
+                let actual = (u[i] as u64) % m;
+                if expected != actual {
+                    println!("Failed at index {}: expected {}, got {}", i, expected, actual);
+                    all_match = false;
+                    break; 
+                }
+            }
+            assert!(all_match, "Ring Inner Product test failed! The math does not match.");
+            println!("Ring Inner Product test passed");
+        }
+    }
 }
