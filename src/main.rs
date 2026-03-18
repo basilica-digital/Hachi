@@ -20,7 +20,7 @@ use rayon::prelude::*;
 
 use crate::fields::fields::*;
 include!("macro.rs");
-// include!("sumcheck.rs");
+include!("sumcheck.rs");
 include!("rns.rs");
 include!("foldwitness.rs");
 include!("foldwitness_jolt.rs");
@@ -30,6 +30,10 @@ include!("commit.rs");
 #[repr(C, align(64))]
 #[derive(Clone, Copy)]
 pub struct Align64<T>(pub T);
+
+#[repr(align(64))]
+#[derive(Clone)]
+pub struct Align64U32(pub [u32; 16]); // 16 * 4 bytes = 64 bytes
 
 #[inline(always)]
 pub unsafe fn add_ring(z: &mut [i16], s: &[i16]){
@@ -238,24 +242,28 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // }
 
 
-    // -----> Commit <-----
-    let n = 1 << 10;
-    let height = 1 << 13;
-    let sz = 1 << 20;
-    let s = &mut generate_random_data_32bit(sz, n);
-    let acap = &mut generate_random_data_32bit(height, n);
-    let bcap = &mut generate_random_data_32bit(height, n);
-    let mut u = Align64([0u32; 1024]);
+    // // -----> Commit <-----
+    // let n = 1 << 10;
+    // let height = 1 << 13;
+    // let sz = 1 << 20;
+    // let s = &mut generate_random_data_32bit(sz, n);
+    // let acap = &mut generate_random_data_32bit(height, n);
+    // let bcap = &mut generate_random_data_32bit(height, n);
+    // let mut t = vec![Align64U32([0u32; 16]); 1<<19];
+    // let mut u = Align64([0u32; 1024]);
 
-    let start = Instant::now();
-    unsafe{
-        commit(&mut u.0, s, acap, bcap);
-    }
-    let commit_duration = start.elapsed();
-    println!("Commit: {:?}", commit_duration);
+    // let start = Instant::now();
+    // unsafe{
+    //     let t_ptr = t.as_mut_ptr() as *mut u32;
+    //     let t_len = (1 << 19) * 16; 
+    //     let t_flat_slice = std::slice::from_raw_parts_mut(t_ptr, t_len);
+    //     commit(&mut u.0, t_flat_slice, s, acap, bcap);
+    // }
+    // let commit_duration = start.elapsed();
+    // println!("Commit: {:?}", commit_duration);
 
-    // // -----> Sumcheck <-----
-    // sumcheck();
+    // -----> Sumcheck <-----
+    sumcheck();
 
 
     Ok(())

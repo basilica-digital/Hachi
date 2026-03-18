@@ -1,5 +1,5 @@
 #[inline(never)]
-pub unsafe fn commit(u: &mut [u32], s: &mut [u32], acap: &mut [u32], bcap: &mut [u32]){
+pub unsafe fn commit(u: &mut [u32], t: &mut [u32], s: &[u32], acap: &[u32], bcap: &[u32]){
     let n = 1 << 10;
     let moduli = [759207937, 759304193];
     let plans: Vec<Plan> = moduli.iter().map(|&q| Plan::try_new(n, q).unwrap()).collect();
@@ -7,7 +7,6 @@ pub unsafe fn commit(u: &mut [u32], s: &mut [u32], acap: &mut [u32], bcap: &mut 
     let height = 1 << 13;
 
     let mut t_vec = vec![_mm512_set1_epi32(0); width * 64];
-    let mut gt_vec = vec![_mm512_set1_epi32(0); height * 64];
     let mut acap1_vec = vec![_mm512_set1_epi32(0); height * 64];
     let mut acap2_vec = vec![_mm512_set1_epi32(0); height * 64];
     let mut bcap1_vec = vec![_mm512_set1_epi32(0); height * 64];
@@ -33,7 +32,7 @@ pub unsafe fn commit(u: &mut [u32], s: &mut [u32], acap: &mut [u32], bcap: &mut 
         plans[1].fwd(&mut b2);
     }
 
-    let gt_ptr = gt_vec.as_mut_ptr();
+    let gt_ptr = t.as_mut_ptr() as *mut __m512i;
     let t_ptr = t_vec.as_mut_ptr();
     let u_ptr = u.as_mut_ptr() as *mut __m512i;
     let acap1_ptr = acap1_vec.as_mut_ptr();
@@ -123,10 +122,7 @@ pub unsafe fn commit(u: &mut [u32], s: &mut [u32], acap: &mut [u32], bcap: &mut 
         let v1_ref = &*(acc1.as_ptr().add(i<<6) as *const [__m512i; 64]);
         let v2_ref = &*(acc2.as_ptr().add(i<<6) as *const [__m512i; 64]);
         irns(v1_ref, v2_ref, t_ptr, i);
-    }
-
-    // decompose t
-    for i in 0..width{
+        // decompose t
         for j in 0..64{
             let mut val = _mm512_loadu_si512(t_ptr.add((i<<6)+j));
             for k in 0..8{
@@ -139,11 +135,10 @@ pub unsafe fn commit(u: &mut [u32], s: &mut [u32], acap: &mut [u32], bcap: &mut 
     // Bt
     let mut v1 = [_mm512_set1_epi32(0); 64];
     let mut v2 = [_mm512_set1_epi32(0); 64];
-    let gt_slice = std::slice::from_raw_parts(gt_ptr as *const u32, height * n);
     // Ring wise inner product
     for i in 0..height{
         let mut gt1 = Align64([0u32; 1024]);
-        gt1.0.copy_from_slice(&gt_slice[i<<10..(i+1)<<10]);
+        gt1.0.copy_from_slice(&t[i<<10..(i+1)<<10]);
         let mut gt2 = gt1;
         plans[0].fwd(&mut gt1.0);
         plans[1].fwd(&mut gt2.0);
