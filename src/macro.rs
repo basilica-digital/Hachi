@@ -161,6 +161,17 @@ pub fn generate_sparse_c(num_rings: usize) -> Vec<u32> {
     c
 }
 
+pub fn generate_sparse_c_idx(num_rings: usize) -> Vec<i16> {
+    let n = 16;
+    let mut c = vec![0i16; num_rings*n];
+    let mut rng = rand::thread_rng();
+
+    for i in 0..num_rings*n{
+        c[i] = rng.gen_range(0..2048 as i16);
+    }
+    c
+}
+
 
 pub fn sparse_random_1_index(s: &mut [u8]){
     let mut rng = thread_rng();

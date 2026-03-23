@@ -680,7 +680,6 @@ pub fn sumcheck(){
         }
     }
 
-
     let mut w10_0 = vec![0u32; n*n];
     let mut w10_1 = vec![0u32; n*n];
     let mut w10_2 = vec![0u32; n*n];
@@ -725,7 +724,7 @@ pub fn sumcheck(){
     unsafe { commit(&mut u, &mut t, &s, &A, &B); }
     
     // compute z
-    unsafe { fold_witness_u32(&mut z, &c, &s); }
+    // unsafe { fold_witness_u32(&mut z, &c, &s); }
 
     // compute u_i
     unsafe {
