@@ -191,11 +191,12 @@ pub unsafe fn ringdmla(c: &mut [u32], a: &[u32], b: &[u32]){
     let q = (1u64 << 32) - 99;
     for i in 0..1024 {
         for j in 0..1024{
-            tmp[i+j] = (tmp[i+j] + (2u64 *a[i] as u64 * b[j] as u64)) % q;
+            tmp[i+j] = (tmp[i+j] + (a[i] as u64 * b[j] as u64)) % q;
         }
     }
     for i in 0..1024{
-        c[i] = ((c[i] as u64 + tmp[i] + q - tmp[i+1024]) % q) as u32;
+        let val = (tmp[i] + q - tmp[i+1024]) % q;
+        c[i] = ((c[i] as u64 + 2 * val) % q) as u32;
     }
 }
 
@@ -284,152 +285,151 @@ pub unsafe fn mle_M(i: u32, u: u32, m: &MBundle) -> [u32; 4]{
     // D
     if i == 0{
         if u < (1<<13){
-            m.0[4*u..4*(u+1)].try_into().unwrap()
+            return m.0[4*u..4*(u+1)].try_into().unwrap();
         }else if u < (2<<13) && u >= (1<<13){
             let idx = u - (1<<13);
-            m.13[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.13[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (3<<13) && u >= (2<<13){
             let idx = u - (2<<13);
-            m.14[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.14[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (4<<13) && u >= (3<<13){
             let idx = u - (3<<13);
-            m.15[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.15[4*idx..4*(idx+1)].try_into().unwrap();
         }else {
-            zero
+            return zero;
         }
     }
     // B
-    else if i == 1{
+    if i == 1{
         if u < (5<<13) && u >= (4<<13){
             let idx = u - (4<<13);
-            m.1[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.1[4*idx..4*(idx+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
     }
     // bG
     else if i == 2{
         if u < 1<<13{
-            m.7[4*u..4*(u+1)].try_into().unwrap()
+            return m.7[4*u..4*(u+1)].try_into().unwrap();
         }else if u < (2<<13) && u >= (1<<13){
             let idx = u - (1<<13);
-            extdbl(m.10[4*idx..4*(idx+1)].try_into().unwrap())
+            return extdbl(m.10[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (3<<13) && u >= (2<<13){
             let idx = u - (2<<13);
-            extdbl(m.9[4*idx..4*(idx+1)].try_into().unwrap())
+            return extdbl(m.9[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (4<<13) && u >= (3<<13){
             let idx = u - (3<<13);
-            extdbl(m.8[4*idx..4*(idx+1)].try_into().unwrap())
+            return extdbl(m.8[4*idx..4*(idx+1)].try_into().unwrap());
         }else{
-            zero
+            return zero;
         }
     }
     else if i == 3{
         if u < 1<<13{
-            m.8[4*u..4*(u+1)].try_into().unwrap()
+            return m.8[4*u..4*(u+1)].try_into().unwrap();
         }else if u < (2<<13) && u >= (1<<13){
             let idx = u - (1<<13);
-            m.7[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.7[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (3<<13) && u >= (2<<13){
             let idx = u - (2<<13);
-            extdbl(m.10[4*idx..4*(idx+1)].try_into().unwrap())
+            return extdbl(m.10[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (4<<13) && u >= (3<<13){
             let idx = u - (3<<13);
-            extdbl(m.9[4*idx..4*(idx+1)].try_into().unwrap())
+            return extdbl(m.9[4*idx..4*(idx+1)].try_into().unwrap());
         }else{
-            zero
+            return zero;
         }
     }
     else if i == 4{
         if u < 1<<13{
-            m.9[4*u..4*(u+1)].try_into().unwrap()
+            return m.9[4*u..4*(u+1)].try_into().unwrap();
         }else if u < (2<<13) && u >= (1<<13){
             let idx = u - (1<<13);
-            m.8[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.8[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (3<<13) && u >= (2<<13){
             let idx = u - (2<<13);
-            m.7[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.7[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (4<<13) && u >= (3<<13){
             let idx = u - (3<<13);
-            extdbl(m.10[4*idx..4*(idx+1)].try_into().unwrap())
+            return extdbl(m.10[4*idx..4*(idx+1)].try_into().unwrap());
         }else{
-            zero
+            return zero;
         }
     }
     else if i == 5{
         if u < 1<<13{
-            m.10[4*u..4*(u+1)].try_into().unwrap()
+            return m.10[4*u..4*(u+1)].try_into().unwrap();
         }else if u < (2<<13) && u >= (1<<13){
             let idx = u - (1<<13);
-            m.9[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.9[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (3<<13) && u >= (2<<13){
             let idx = u - (2<<13);
-            m.8[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.8[4*idx..4*(idx+1)].try_into().unwrap();
         }else if u < (4<<13) && u >= (3<<13){
             let idx = u - (3<<13);
-            m.7[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.7[4*idx..4*(idx+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
     }
     // cG, aG
     else if i == 6{
         if u >= 5<<13 && u < 6<<13 {
             let idx = u - (5<<13);
-            extneg(m.3[4*idx..4*(idx+1)].try_into().unwrap())
+            return extneg(m.3[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (1<<13){
-            m.11[4*u..4*(u+1)].try_into().unwrap()
+            return m.11[4*u..4*(u+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
     }
     else if i == 7{
         if u >= 5<<13 && u < 6<<13 {
             let idx = u - (5<<13);
-            extneg(m.4[4*idx..4*(idx+1)].try_into().unwrap())
+            return extneg(m.4[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (2<<13) && u >= (1<<13){
             let idx = u - (1<<13);
-            m.11[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.11[4*idx..4*(idx+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
     }
     else if i == 8{
         if u >= 5<<13 && u < 6<<13 {
             let idx = u - (5<<13);
-            extneg(m.5[4*idx..4*(idx+1)].try_into().unwrap())
+            return extneg(m.5[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (3<<13) && u >= (2<<13){
             let idx = u - (2<<13);
-            m.11[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.11[4*idx..4*(idx+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
     }
     else if i == 9{
         if u >= 5<<13 && u < 6<<13 {
             let idx = u - (5<<13);
-            extneg(m.6[4*idx..4*(idx+1)].try_into().unwrap())
+            return extneg(m.6[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (4<<13) && u >= (3<<13){
             let idx = u - (3<<13);
-            m.11[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.11[4*idx..4*(idx+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
     }
     // cG, A
     else if i == 10{
         if u >= 5<<13 && u < 6<<13 {
             let idx = u - (5<<13);
-            extneg(m.2[4*idx..4*(idx+1)].try_into().unwrap())
+            return extneg(m.2[4*idx..4*(idx+1)].try_into().unwrap());
         }else if u < (5<<13) && u >= (4<<13){
             let idx = u - (4<<13);
-            m.11[4*idx..4*(idx+1)].try_into().unwrap()
+            return m.11[4*idx..4*(idx+1)].try_into().unwrap();
         }else{
-            zero
+            return zero;
         }
-    } else {
-        zero
     }
+    return zero;
 }
 
 pub unsafe fn mle_m(i: u32, u: u32, m: &MBundle) -> [u32; 4]{
@@ -522,11 +522,11 @@ pub unsafe fn prove_sumcheck(mut W_table: Vec<[u32; 4]>, mut M_table: Vec<[u32; 
         // Verifier check p0 + p1 == target_sum
         let current_sum = extadd(&p0, &p1);
         if current_sum != target_sum {
-            panic!("Sumcheck failed");
+            panic!("Sumcheck failed at x-round {}", round);
         }
         
         // get random challenge r
-        let r_raw = generate_random_data_30bit(1, 4);
+        let r_raw = generate_random_data_30bit(1, 16);
         let mut r = [0u32; 4];
         r.copy_from_slice(&r_raw[0..4]);
         
@@ -541,6 +541,8 @@ pub unsafe fn prove_sumcheck(mut W_table: Vec<[u32; 4]>, mut M_table: Vec<[u32; 
 
         target_sum = eval_quadratic(&p0, &p1, &p2, &r);
     }
+
+    println!("first variable checked");
 
     // fold y
     let m_scalar = M_table[0]; 
@@ -576,11 +578,11 @@ pub unsafe fn prove_sumcheck(mut W_table: Vec<[u32; 4]>, mut M_table: Vec<[u32; 
         // Verifier check p0 + p1 == target_sum
         let current_sum = extadd(&p0, &p1);
         if current_sum != target_sum {
-            panic!("Sumcheck failed");
+            panic!("Sumcheck failed at y-round {}", round);
         }
         
         // get random challenge r
-        let r_raw = generate_random_data_30bit(1, 4);
+        let r_raw = generate_random_data_30bit(1, 16);
         let mut r = [0u32; 4];
         r.copy_from_slice(&r_raw[0..4]);
         
@@ -593,6 +595,9 @@ pub unsafe fn prove_sumcheck(mut W_table: Vec<[u32; 4]>, mut M_table: Vec<[u32; 
 
         target_sum = eval_quadratic(&p0, &p1, &p2, &r);
     }
+
+    println!("second variable checked");
+    
     let final_w = W_table[0];
     let final_alpha = alpha_vec[0];
     let final_m = M_table[0];
@@ -607,6 +612,8 @@ pub unsafe fn prove_sumcheck(mut W_table: Vec<[u32; 4]>, mut M_table: Vec<[u32; 
 }
 
 pub fn sumcheck(){
+
+    let start = Instant::now();
     let constraints = 11;
     let height = 1<<13;
     let n = 1<<10; //ring dimension
@@ -662,6 +669,11 @@ pub fn sumcheck(){
     let mut u2 = vec![0u32; n];
     let mut u3 = vec![0u32; n];
 
+    
+    let duration = start.elapsed();
+    println!("Init complete: {:?}", duration);
+    let start = Instant::now();
+    
     // compute aG, bG, cG
     for i in 0..1024 {
         for k in 0..8 {
@@ -680,7 +692,7 @@ pub fn sumcheck(){
         }
     }
 
-    let mut w10_0 = vec![0u32; n*n];
+    let mut w10_0 = vec![0u32; n*n]; 
     let mut w10_1 = vec![0u32; n*n];
     let mut w10_2 = vec![0u32; n*n];
     let mut w10_3 = vec![0u32; n*n];
@@ -720,36 +732,60 @@ pub fn sumcheck(){
         }
     }
 
+    let duration = start.elapsed();
+    println!("aG, bG, cG, w, v computed: {:?}", duration);
+    let start = Instant::now();
+
     // compute t, u
     unsafe { commit(&mut u, &mut t, &s, &A, &B); }
+
+    let duration = start.elapsed();
+    println!("commit computed: {:?}", duration);
+    let start = Instant::now();
+
+    for val in t.iter_mut() {
+        if *val >= q as u32 { *val -= q as u32; }
+    }
+    for val in u.iter_mut() {
+        if *val >= q as u32 { *val -= q as u32; }
+    }
     
     // compute z
-    // unsafe { fold_witness_u32(&mut z, &c, &s); }
+    unsafe { fold_witness_u32(&mut z, &c, &s); }
+
+    let duration = start.elapsed();
+    println!("fold witness computed: {:?}", duration);
+    let start = Instant::now();
+
 
     // compute u_i
     unsafe {
         for i in 0..height{
-            ringmla(&mut u0[i*n..(i+1)*n], &b0G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
-            ringdmla(&mut u0[i*n..(i+1)*n], &b3G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
-            ringdmla(&mut u0[i*n..(i+1)*n], &b2G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
-            ringdmla(&mut u0[i*n..(i+1)*n], &b1G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
+            ringmla(&mut u0, &b0G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
+            ringdmla(&mut u0, &b3G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
+            ringdmla(&mut u0, &b2G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
+            ringdmla(&mut u0, &b1G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
             
-            ringmla(&mut u0[i*n..(i+1)*n], &b1G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
-            ringmla(&mut u0[i*n..(i+1)*n], &b0G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
-            ringdmla(&mut u0[i*n..(i+1)*n], &b3G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
-            ringdmla(&mut u0[i*n..(i+1)*n], &b2G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
+            ringmla(&mut u1, &b1G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
+            ringmla(&mut u1, &b0G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
+            ringdmla(&mut u1, &b3G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
+            ringdmla(&mut u1, &b2G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
             
-            ringmla(&mut u0[i*n..(i+1)*n], &b2G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
-            ringmla(&mut u0[i*n..(i+1)*n], &b1G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
-            ringmla(&mut u0[i*n..(i+1)*n], &b0G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
-            ringdmla(&mut u0[i*n..(i+1)*n], &b3G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
+            ringmla(&mut u2, &b2G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
+            ringmla(&mut u2, &b1G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
+            ringmla(&mut u2, &b0G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
+            ringdmla(&mut u2, &b3G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
             
-            ringmla(&mut u0[i*n..(i+1)*n], &b3G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
-            ringmla(&mut u0[i*n..(i+1)*n], &b2G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
-            ringmla(&mut u0[i*n..(i+1)*n], &b1G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
-            ringmla(&mut u0[i*n..(i+1)*n], &b0G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
+            ringmla(&mut u3, &b3G[i*n..(i+1)*n], &w0[i*n..(i+1)*n]);
+            ringmla(&mut u3, &b2G[i*n..(i+1)*n], &w1[i*n..(i+1)*n]);
+            ringmla(&mut u3, &b1G[i*n..(i+1)*n], &w2[i*n..(i+1)*n]);
+            ringmla(&mut u3, &b0G[i*n..(i+1)*n], &w3[i*n..(i+1)*n]);
         }
     }
+
+    let duration = start.elapsed();
+    println!("u_i computed: {:?}", duration);
+    let start = Instant::now();
 
     // compute r: Mz = y + r*(x^1024+1)
     unsafe {
@@ -800,10 +836,14 @@ pub fn sumcheck(){
         }
     }
 
+    let duration = start.elapsed();
+    println!("r computed: {:?}", duration);
+    let start = Instant::now();
+
     let wbundle: WBundle = (w0, w1, w2, w3, t, z);
 
     // compute alpha
-    let alpha = generate_random_data_30bit(1, 4);
+    let alpha = generate_random_data_30bit(1, 16);
     let mut alpha_vec = vec![0u32; 4*1025];
     alpha_vec[0] = 1;
     alpha_vec[1] = 0;
@@ -816,10 +856,10 @@ pub fn sumcheck(){
         }
     }
     // alpha_vec[4*1024] = - (alpha^1024 + 1)
-    alpha_vec[4096] = (q - ((alpha_vec[4096] as u64 + 1u64)%q)) as u32;
-    alpha_vec[4097] = (q - (alpha_vec[4097] as u64)) as u32;
-    alpha_vec[4098] = (q - (alpha_vec[4098] as u64)) as u32;
-    alpha_vec[4099] = (q - (alpha_vec[4099] as u64)) as u32;
+    alpha_vec[4096] = ((q - ((alpha_vec[4096] as u64 + 1u64) % q)) % q) as u32;
+    alpha_vec[4097] = ((q - (alpha_vec[4097] as u64 % q)) % q) as u32;
+    alpha_vec[4098] = ((q - (alpha_vec[4098] as u64 % q)) % q) as u32;
+    alpha_vec[4099] = ((q - (alpha_vec[4099] as u64 % q)) % q) as u32;
 
     // substitute alpha into M
     // M(alpha)
@@ -862,23 +902,10 @@ pub fn sumcheck(){
     //                          0       1        2         3          4          5          6          7           8          9         10        11         12                              13        14        15
     let mbundle: MBundle = (D0_alpha, B_alpha, A_alpha, a0G_alpha, a1G_alpha, a2G_alpha, a3G_alpha, b0G_alpha, b1G_alpha, b2G_alpha, b3G_alpha, cG_alpha, alpha_vec[4096..4100].to_vec(), D1_alpha, D2_alpha, D3_alpha);
 
-    // // z(alpha)
-    // let mut w0_alpha = vec![0u32; 1<<15];
-    // let mut w1_alpha = vec![0u32; 1<<15];
-    // let mut w2_alpha = vec![0u32; 1<<15];
-    // let mut w3_alpha = vec![0u32; 1<<15];
-    // let mut t_alpha = vec![0u32; 1<<15];
-    // let mut z_alpha = vec![0u32; 1<<15];
-    // for i in 0..(1<<13){
-    //     for j in 0..n{
-    //         ext_base_mla(&mut w0_alpha[4*i..4*(i+1)], &alpha_vec[4*j..4*(j+1)], w0[i*n+j]);
-    //         ext_base_mla(&mut w1_alpha[4*i..4*(i+1)], &alpha_vec[4*j..4*(j+1)], w1[i*n+j]);
-    //         ext_base_mla(&mut w2_alpha[4*i..4*(i+1)], &alpha_vec[4*j..4*(j+1)], w2[i*n+j]);
-    //         ext_base_mla(&mut w3_alpha[4*i..4*(i+1)], &alpha_vec[4*j..4*(j+1)], w3[i*n+j]);
-    //         ext_base_mla(&mut t_alpha[4*i..4*(i+1)], &alpha_vec[4*j..4*(j+1)], t[i*n+j]);
-    //         ext_base_mla(&mut z_alpha[4*i..4*(i+1)], &alpha_vec[4*j..4*(j+1)], z[i*n+j]);
-    //     }
-    // }
+    let duration = start.elapsed();
+    println!("M_alpha computed: {:?}", duration);
+    let start = Instant::now();
+
     
     // y(alpha)
     let mut v_alpha = vec![0u32; 1<<2];
@@ -899,14 +926,9 @@ pub fn sumcheck(){
         }
     }
 
-    // // r(alpha)
-    // let mut r_alpha = vec![0u32; 14*4];
-
-    // for i in 0..14{
-    //     for j in 0..n{
-    //         ext_base_mla(&mut r_alpha[i*4..(i+1)*4], &alpha_vec[4*j..4*(j+1)], r[i*n+j]);
-    //     }
-    // }
+    let duration = start.elapsed();
+    println!("y(alpha) computed: {:?}", duration);
+    let start = Instant::now();
 
     // MLE
     let mut tau_0 = [[0u32; 4]; 26]; // log n + log width*height
@@ -929,6 +951,10 @@ pub fn sumcheck(){
         extmla(&mut a, &tbl_tau1[5], &u3_alpha);
     }
 
+    let duration = start.elapsed();
+    println!("eq_table computed: {:?}", duration);
+    let start = Instant::now();
+
     let mut M_table = vec![[0u32; 4]; 1<<16];
     for x in 0..(6*(1<<13) + constraints) {
         let mut sum = [0u32; 4];
@@ -941,6 +967,10 @@ pub fn sumcheck(){
         M_table[x as usize] = sum;
     }
 
+    let duration = start.elapsed();
+    println!("M_table computed: {:?}", duration);
+    let start = Instant::now();
+
     let mut W_table = vec![[0u32; 4]; 1<<26]; // (6*(1<<13) + constraints) * 1024 padding to 1<<26
     for u in 0..(6*(1<<13) + constraints){
         for l in 0..1024{
@@ -948,11 +978,21 @@ pub fn sumcheck(){
         }
     }
 
+    let duration = start.elapsed();
+    println!("W_table computed: {:?}", duration);
+    let start = Instant::now();
+
     let mut alpha_vec_ext = Vec::with_capacity(1024);
     for i in 0..1024 {
         alpha_vec_ext.push(alpha_vec[4*i..4*(i+1)].try_into().unwrap());
     }
 
+    let duration = start.elapsed();
+    println!("alpha_table computed: {:?}", duration);
+    let start = Instant::now();
+
     // Sumcheck
     unsafe { prove_sumcheck(W_table, M_table, alpha_vec_ext, a); }
+    let duration = start.elapsed();
+    println!("sumcheck computed: {:?}", duration);
 }

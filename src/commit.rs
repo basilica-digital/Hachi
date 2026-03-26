@@ -19,8 +19,8 @@ pub unsafe fn commit(u: &mut [u32], t: &mut [u32], s: &[u32], acap: &[u32], bcap
     // RNS and ntt on A, B
     for i in 0..height{
         for j in (0..1024).step_by(16) {
-            rns_decompose_16_elements(&acap[(i<<10)+j..(i<<10)+(j+16)], &mut acap1_slice[(i<<10)+j..(i<<10)+(j+16)], &mut acap2_slice[(i<<10)+j..(i<<10)+(j+16)], j);
-            rns_decompose_16_elements(&bcap[(i<<10)+j..(i<<10)+(j+16)], &mut bcap1_slice[(i<<10)+j..(i<<10)+(j+16)], &mut bcap2_slice[(i<<10)+j..(i<<10)+(j+16)], j);
+            rns_decompose_16_elements(&acap[(i<<10)+j..(i<<10)+(j+16)], &mut acap1_slice[(i<<10)+j..(i<<10)+(j+16)], &mut acap2_slice[(i<<10)+j..(i<<10)+(j+16)], 0);
+            rns_decompose_16_elements(&bcap[(i<<10)+j..(i<<10)+(j+16)], &mut bcap1_slice[(i<<10)+j..(i<<10)+(j+16)], &mut bcap2_slice[(i<<10)+j..(i<<10)+(j+16)], 0);
         }
         let mut a1 = &mut acap1_slice[i<<10..(i+1)<<10];
         let mut a2 = &mut acap2_slice[i<<10..(i+1)<<10];
@@ -60,10 +60,8 @@ pub unsafe fn commit(u: &mut [u32], t: &mut [u32], s: &[u32], acap: &[u32], bcap
     let acap2_ptr_simd = acap2_ptr as *const __m512i;
 
     for j in 0..height {
-        let original_j = j/8;
-        let bit_shift = (j%8)*4;
-        let shift_count = _mm_cvtsi32_si128(bit_shift as i32);
-        let s_row_offset = original_j << 20;
+        // Optimize!! Gadget s
+        let s_row_offset = j << 20;
         let a1_ptr = acap1_ptr_simd.add(j << 6);
         let a2_ptr = acap2_ptr_simd.add(j << 6);
         for i in 0..width{
@@ -73,13 +71,33 @@ pub unsafe fn commit(u: &mut [u32], t: &mut [u32], s: &[u32], acap: &[u32], bcap
             let s_raw_ptr = s_raw_slice.as_ptr() as *const __m512i;
             let s1_ptr = s1.0.as_mut_ptr() as *mut __m512i;
             let s2_ptr = s2.0.as_mut_ptr() as *mut __m512i;
+            
             for k in 0..64 {
                 let val = _mm512_loadu_si512(s_raw_ptr.add(k));
-                let shifted = _mm512_srl_epi32(val, shift_count);
-                let decomp = _mm512_and_epi32(shifted, mask15);
+                let decomp = _mm512_and_epi32(val, mask15);
                 _mm512_store_si512(s1_ptr.add(k), decomp);
                 _mm512_store_si512(s2_ptr.add(k), decomp);
             }
+        // let original_j = j/8;
+        // let bit_shift = (j%8)*4;
+        // let shift_count = _mm_cvtsi32_si128(bit_shift as i32);
+        // let s_row_offset = original_j << 20;
+        // let a1_ptr = acap1_ptr_simd.add(j << 6);
+        // let a2_ptr = acap2_ptr_simd.add(j << 6);
+        // for i in 0..width{
+        //     let mut s1 = Align64([0u32; 1024]);
+        //     let mut s2 = Align64([0u32; 1024]);
+        //     let s_raw_slice = &s[(s_row_offset + (i << 10)) ..]; 
+        //     let s_raw_ptr = s_raw_slice.as_ptr() as *const __m512i;
+        //     let s1_ptr = s1.0.as_mut_ptr() as *mut __m512i;
+        //     let s2_ptr = s2.0.as_mut_ptr() as *mut __m512i;
+        //     for k in 0..64 {
+        //         let val = _mm512_loadu_si512(s_raw_ptr.add(k));
+        //         let shifted = _mm512_srl_epi32(val, shift_count);
+        //         let decomp = _mm512_and_epi32(shifted, mask15);
+        //         _mm512_store_si512(s1_ptr.add(k), decomp);
+        //         _mm512_store_si512(s2_ptr.add(k), decomp);
+        //     }
             plans[0].fwd(&mut s1.0);
             plans[1].fwd(&mut s2.0);
             let s1_ptr = s1.0.as_ptr() as *const __m512i;
@@ -121,7 +139,7 @@ pub unsafe fn commit(u: &mut [u32], t: &mut [u32], s: &[u32], acap: &[u32], bcap
         plans[1].inv(slice::from_raw_parts_mut(acc2_ptr, 1024));
         let v1_ref = &*(acc1.as_ptr().add(i<<6) as *const [__m512i; 64]);
         let v2_ref = &*(acc2.as_ptr().add(i<<6) as *const [__m512i; 64]);
-        irns(v1_ref, v2_ref, t_ptr, i);
+        irns(v1_ref, v2_ref, t_ptr, i<<6);
         // decompose t
         for j in 0..64{
             let mut val = _mm512_loadu_si512(t_ptr.add((i<<6)+j));

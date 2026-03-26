@@ -73,3 +73,41 @@ pub unsafe fn fold_witness(z: &mut [i16], c: &[i16], s: &[i16]) {
         fold_witness_row(z_row, c, s_row_ptr, z_buf_array);
     });
 }
+
+#[inline(never)]
+pub unsafe fn fold_witness_u32(z: &mut [u32], c: &[u32], s: &[u32]) {
+    // convert data type
+    let q = ((1u64 << 32) - 99) as u32;
+    let mut c_i16 = vec![0i16; (1<<14)];
+    let mut s_i16 = vec![0i16; s.len()];
+    let mut z_i16 = vec![0i16; z.len()];
+    for i in 0..(c.len()/1024){
+        let mut id = i*16;
+        for j in 0..1024{
+            if c[i*1024+j] == 1{
+                c_i16[id] = j as i16;
+                id += 1;
+            }else if c[i*1024+j] == (q - 1){
+                c_i16[id] = (j+1024) as i16;
+                id += 1;
+            }
+            if id == (i+1)*16{
+                break;
+            }
+        }
+    }
+    for i in 0..s.len(){
+        s_i16[i] = s[i] as i16;
+    }
+
+    // fold
+    fold_witness(&mut z_i16, &c_i16, &s_i16);
+    // convert data type
+    for i in 0..z.len(){
+        let mut val = z_i16[i] as i64;
+        if val < 0 {
+            val += q as i64;
+        }
+        z[i] = val as u32;
+    }
+}

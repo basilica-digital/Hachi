@@ -126,20 +126,20 @@ pub fn fold_witness_ref(z: &mut [i16], c: &[i16], s: &[i16]){
 #[allow(non_snake_case)]
 fn main()-> Result<(), Box<dyn std::error::Error>>{
 
-    // -----> FOLDING WITNESS <-----
-    let mut s: Vec<i16> = vec![0i16; 1<<33];
-    thread_rng().fill(&mut s[..]);
-    for val in s.iter_mut() { *val &= 0xF; }
-    let c = generate_sparse_c_idx(1<<10);
-    let mut z: Vec<i16> = vec![0; 1<<23];
-    let mut zref: Vec<i16> = vec![0; 1<<23];
+    // // -----> FOLDING WITNESS <-----
+    // let mut s: Vec<i16> = vec![0i16; 1<<33];
+    // thread_rng().fill(&mut s[..]);
+    // for val in s.iter_mut() { *val &= 0xF; }
+    // let c = generate_sparse_c_idx(1<<10);
+    // let mut z: Vec<i16> = vec![0; 1<<23];
+    // let mut zref: Vec<i16> = vec![0; 1<<23];
 
-    let start = Instant::now();
-    unsafe {
-        fold_witness(&mut z, &c, &s);
-    }
-    let fw_duration = start.elapsed();
-    println!("Folding witness: {:?}", fw_duration);
+    // let start = Instant::now();
+    // unsafe {
+    //     fold_witness(&mut z, &c, &s);
+    // }
+    // let fw_duration = start.elapsed();
+    // println!("Folding witness: {:?}", fw_duration);
     // fold_witness_ref(&mut zref, &c, &s);
     // for i in 0..(1<<23){
     //     assert_eq!(z[i], zref[i]);
@@ -213,8 +213,8 @@ fn main()-> Result<(), Box<dyn std::error::Error>>{
     // let commit_duration = start.elapsed();
     // println!("Commit: {:?}", commit_duration);
 
-    // // -----> Sumcheck <-----
-    // sumcheck();
+    // -----> Sumcheck <-----
+    sumcheck();
 
 
     Ok(())
