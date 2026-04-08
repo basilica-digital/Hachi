@@ -1,5 +1,5 @@
 [package]
-name = "ntt_avx512_test"
+name = "Hachi30"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,6 +9,8 @@ rand = "0.8"
 pulp = "0.21.5"
 bytemuck = { version = "1.24", features = ["avx512_simd", "extern_crate_std"] }
 rayon = "1.11.0"
+blake3 = "1.5"
+rand_chacha = "0.3"
 
 [lints.rust]
 warnings = "allow"
