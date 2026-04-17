@@ -3,6 +3,38 @@ use std::arch::x86_64::*;
 pub type EF8 = (__m512i, __m512i, __m512i, __m512i);
 
 #[inline(always)]
+pub unsafe fn basemul_vec(
+    c: __m512i, 
+    a_ptr: *const u32, 
+    b_ptr: *const u32
+) -> __m512i {
+    let v_99 = _mm512_set1_epi64(99);
+    let v_mask32 = _mm512_set1_epi64(0xFFFFFFFF);
+    let a256 = _mm256_loadu_si256(a_ptr as *const __m256i);
+    let b256 = _mm256_loadu_si256(b_ptr as *const __m256i);
+    let a_ext = _mm512_cvtepu32_epi64(a256);
+    let b_ext = _mm512_cvtepu32_epi64(b256);
+    let prod = _mm512_mul_epu32(a_ext, b_ext);
+    let high = _mm512_srli_epi64(prod, 32);
+    let low = _mm512_and_si512(prod, v_mask32);
+    let high99 = _mm512_mul_epu32(high, v_99);
+    let reduced = _mm512_add_epi64(low, high99);
+    _mm512_add_epi64(c, reduced)
+}
+
+#[inline(always)]
+pub unsafe fn basemul_vec_register(
+    c: __m512i, a: __m512i, b: __m512i, v_99: __m512i, v_mask32: __m512i
+) -> __m512i {
+    let prod = _mm512_mul_epu32(a, b);
+    let high = _mm512_srli_epi64(prod, 32);
+    let low = _mm512_and_si512(prod, v_mask32);
+    let high99 = _mm512_mul_epu32(high, v_99);
+    let reduced = _mm512_add_epi64(low, high99);
+    _mm512_add_epi64(c, reduced)
+}
+
+#[inline(always)]
 pub unsafe fn load_vec_to_m512(src: &[u32], offset: usize) -> __m512i {
     let ptr = src.as_ptr().add(offset) as *const __m512i;
     _mm512_load_si512(ptr)
@@ -555,12 +587,12 @@ pub unsafe fn sum_soa_to_aos(soa: EF8) -> [u32; 4] {
 
 #[inline(always)]
 pub unsafe fn extmul_8x_local(a: EF8, b: EF8) -> EF8 {
-    let mask32 = _mm512_set1_epi64(0xFFFFFFFF);
-    let c99 = _mm512_set1_epi64(99);
+    let q_vec = _mm512_set1_epi64(4294967197);
     let red_simd = |x: __m512i| -> __m512i {
-        let hi = _mm512_srli_epi64(x, 32); let lo = _mm512_and_si512(x, mask32);
-        _mm512_add_epi64(lo, _mm512_mullo_epi64(hi, c99))
+        let hi = _mm512_srli_epi64(x, 32);
+        _mm512_sub_epi64(x, _mm512_mullo_epi64(hi, q_vec))
     };
+
     let p00 = red_simd(_mm512_mul_epu32(a.0, b.0)); let p01 = red_simd(_mm512_mul_epu32(a.0, b.1));
     let p02 = red_simd(_mm512_mul_epu32(a.0, b.2)); let p03 = red_simd(_mm512_mul_epu32(a.0, b.3));
     let p10 = red_simd(_mm512_mul_epu32(a.1, b.0)); let p11 = red_simd(_mm512_mul_epu32(a.1, b.1));
@@ -569,19 +601,25 @@ pub unsafe fn extmul_8x_local(a: EF8, b: EF8) -> EF8 {
     let p22 = red_simd(_mm512_mul_epu32(a.2, b.2)); let p23 = red_simd(_mm512_mul_epu32(a.2, b.3));
     let p30 = red_simd(_mm512_mul_epu32(a.3, b.0)); let p31 = red_simd(_mm512_mul_epu32(a.3, b.1));
     let p32 = red_simd(_mm512_mul_epu32(a.3, b.2)); let p33 = red_simd(_mm512_mul_epu32(a.3, b.3));
-
-    let t0 = p00; let t1 = _mm512_add_epi64(p01, p10); let t2 = _mm512_add_epi64(_mm512_add_epi64(p02, p11), p20);
-    let t3 = _mm512_add_epi64(_mm512_add_epi64(_mm512_add_epi64(p03, p12), p21), p30);
-    let t4 = _mm512_add_epi64(_mm512_add_epi64(p13, p22), p31); let t5 = _mm512_add_epi64(p23, p32); let t6 = p33;
-
-    let final_red = |mut x: __m512i| -> __m512i {
-        x = red_simd(x); x = red_simd(x);
-        let q_vec = _mm512_set1_epi64(4294967197); let ge_q = _mm512_cmpge_epu64_mask(x, q_vec);
-        _mm512_mask_sub_epi64(x, ge_q, x, q_vec)
+    let t0 = p00; 
+    let t1 = _mm512_add_epi64(p01, p10); 
+    let t2 = _mm512_add_epi64(p02, _mm512_add_epi64(p11, p20));
+    let t3 = _mm512_add_epi64(_mm512_add_epi64(p03, p12), _mm512_add_epi64(p21, p30));
+    let t4 = _mm512_add_epi64(p13, _mm512_add_epi64(p22, p31));
+    let t5 = _mm512_add_epi64(p23, p32); 
+    let t6 = p33;
+    let final_red = |x: __m512i| -> __m512i {
+        let x1 = red_simd(x);
+        let ge_q = _mm512_cmpge_epu64_mask(x1, q_vec);
+        _mm512_mask_sub_epi64(x1, ge_q, x1, q_vec)
     };
 
-    (final_red(_mm512_add_epi64(t0, _mm512_slli_epi64(t4, 1))), final_red(_mm512_add_epi64(t1, _mm512_slli_epi64(t5, 1))),
-     final_red(_mm512_add_epi64(t2, _mm512_slli_epi64(t6, 1))), final_red(t3))
+    (
+        final_red(_mm512_add_epi64(t0, _mm512_slli_epi64(t4, 1))), 
+        final_red(_mm512_add_epi64(t1, _mm512_slli_epi64(t5, 1))),
+        final_red(_mm512_add_epi64(t2, _mm512_slli_epi64(t6, 1))), 
+        final_red(t3)
+    )
 }
 
 #[inline(always)]

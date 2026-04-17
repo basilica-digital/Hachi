@@ -6,7 +6,7 @@ use tfhe_ntt::prime32::Plan;
 use std::slice;
 use crate::Q;
 
-pub unsafe fn commit(u: &mut [u32], r: &mut [u32], t: &mut [u32], s: &[u8], acap: &[u32], bcap: &[u32]) { 
+pub unsafe fn commit(u: &mut [u32], r: &mut [u32], t: &mut [u32], s: &[u8], dcap: &[u32]) { 
     let n = 1 << 10;
     let plans: Vec<Plan> = vec![
         Plan::try_new(1024, 759207937).unwrap(),
@@ -14,43 +14,49 @@ pub unsafe fn commit(u: &mut [u32], r: &mut [u32], t: &mut [u32], s: &[u8], acap
         Plan::try_new(2048, 2079301633).unwrap(),
         Plan::try_new(2048, 2079305729).unwrap(),
     ];
-    let width = 1 << 10;
-    let height = 1 << 13;
+    let width = 1<<10;
+    let height_2 = 1<<14;
+    let height_4 = 1<<13;
     let mut t_vec = vec![_mm512_set1_epi32(0); width * 64];
-    let mut acap1_vec = vec![_mm512_set1_epi32(0); height * 64];
-    let mut acap2_vec = vec![_mm512_set1_epi32(0); height * 64];
-    let mut bcap1_vec = vec![_mm512_set1_epi32(0); height * 128];
-    let mut bcap2_vec = vec![_mm512_set1_epi32(0); height * 128];
-    let acap1_slice = std::slice::from_raw_parts_mut(acap1_vec.as_mut_ptr() as *mut u32, height * n);
-    let acap2_slice = std::slice::from_raw_parts_mut(acap2_vec.as_mut_ptr() as *mut u32, height * n);
-    let bcap1_slice = std::slice::from_raw_parts_mut(bcap1_vec.as_mut_ptr() as *mut u32, height*n*2);
-    let bcap2_slice = std::slice::from_raw_parts_mut(bcap2_vec.as_mut_ptr() as *mut u32, height*n*2);
-    // RNS and ntt on A, B
-    for i in 0..height{
+    let mut dcap1_vec_1024 = vec![_mm512_set1_epi32(0); height_4 * 64];
+    let mut dcap2_vec_1024 = vec![_mm512_set1_epi32(0); height_4 * 64];
+    let mut dcap1_vec_2048 = vec![_mm512_set1_epi32(0); height_2 * 128];
+    let mut dcap2_vec_2048 = vec![_mm512_set1_epi32(0); height_2 * 128];
+    let dcap1_slice_1024 = std::slice::from_raw_parts_mut(dcap1_vec_1024.as_mut_ptr() as *mut u32, height_4 * n);
+    let dcap2_slice_1024 = std::slice::from_raw_parts_mut(dcap2_vec_1024.as_mut_ptr() as *mut u32, height_4 * n);
+    let dcap1_slice_2048 = std::slice::from_raw_parts_mut(dcap1_vec_2048.as_mut_ptr() as *mut u32, height_2*n*2);
+    let dcap2_slice_2048 = std::slice::from_raw_parts_mut(dcap2_vec_2048.as_mut_ptr() as *mut u32, height_2*n*2);
+    // RNS and ntt on A
+    for i in 0..height_4{
         for j in (0..1024).step_by(16) {
-            rns_decompose_16_elements(&acap[(i<<10)+j..(i<<10)+(j+16)], &mut acap1_slice[(i<<10)+j..(i<<10)+(j+16)], &mut acap2_slice[(i<<10)+j..(i<<10)+(j+16)], 0);
+            rns_decompose_16_elements(&dcap[(i<<10)+j..(i<<10)+(j+16)], &mut dcap1_slice_1024[(i<<10)+j..(i<<10)+(j+16)], &mut dcap2_slice_1024[(i<<10)+j..(i<<10)+(j+16)], 0);
+        }
+        let mut d1_1024 = &mut dcap1_slice_1024[i<<10..(i+1)<<10];
+        let mut d2_1024 = &mut dcap2_slice_1024[i<<10..(i+1)<<10];
+        plans[0].fwd(&mut d1_1024);
+        plans[1].fwd(&mut d2_1024);
+    }
+    // RNS and ntt on B
+    for i in 0..height_2{
+        for j in (0..1024).step_by(16) {
             rns_2048(
-                &bcap[(i<<10)+j .. (i<<10)+(j+16)], 
-                &mut bcap1_slice[(i<<11)+j..(i<<11)+(j+16)], 
-                &mut bcap2_slice[(i<<11)+j..(i<<11)+(j+16)]
+                &dcap[(i<<10)+j .. (i<<10)+(j+16)], 
+                &mut dcap1_slice_2048[(i<<11)+j..(i<<11)+(j+16)], 
+                &mut dcap2_slice_2048[(i<<11)+j..(i<<11)+(j+16)]
             );
         }
-        let mut a1 = &mut acap1_slice[i<<10..(i+1)<<10];
-        let mut a2 = &mut acap2_slice[i<<10..(i+1)<<10];
-        let mut b1 = &mut bcap1_slice[i<<11 .. (i+1)<<11];
-        let mut b2 = &mut bcap2_slice[i<<11 .. (i+1)<<11];
-        plans[0].fwd(&mut a1);
-        plans[1].fwd(&mut a2);
-        plans[2].fwd(&mut b1);
-        plans[3].fwd(&mut b2);
+        let mut d1_2048 = &mut dcap1_slice_2048[i<<11 .. (i+1)<<11];
+        let mut d2_2048 = &mut dcap2_slice_2048[i<<11 .. (i+1)<<11];
+        plans[2].fwd(&mut d1_2048);
+        plans[3].fwd(&mut d2_2048);
     }
     let gt_ptr = t.as_mut_ptr() as *mut __m512i;
     let t_ptr = t_vec.as_mut_ptr();
     let u_ptr = u.as_mut_ptr() as *mut __m512i;
-    let acap1_ptr = acap1_vec.as_mut_ptr();
-    let acap2_ptr = acap2_vec.as_mut_ptr();
-    let bcap1_ptr = bcap1_vec.as_mut_ptr();
-    let bcap2_ptr = bcap2_vec.as_mut_ptr();
+    let dcap1_ptr_1024 = dcap1_vec_1024.as_mut_ptr();
+    let dcap2_ptr_1024 = dcap2_vec_1024.as_mut_ptr();
+    let dcap1_ptr_2048 = dcap1_vec_2048.as_mut_ptr();
+    let dcap2_ptr_2048 = dcap2_vec_2048.as_mut_ptr();
     // As
     let mut acc1 = vec![_mm512_set1_epi32(0); 1<<16];
     let mut acc2 = vec![_mm512_set1_epi32(0); 1<<16];
@@ -63,17 +69,17 @@ pub unsafe fn commit(u: &mut [u32], r: &mut [u32], t: &mut [u32], s: &[u8], acap
     let q3_inv = _mm512_set1_epi32(-1475321855);
     let q4 = _mm512_set1_epi32(2079305729);
     let q4_inv = _mm512_set1_epi32(-1659875327);
-    let mask15 = _mm512_set1_epi32(15);
+    let mask3 = _mm512_set1_epi32(3);
     let mask_0f = _mm_set1_epi8(0x0F);
     let acc1_ptr_base = acc1.as_mut_ptr() as *mut __m512i;
     let acc2_ptr_base = acc2.as_mut_ptr() as *mut __m512i;
-    let acap1_ptr_simd = acap1_ptr as *const __m512i;
-    let acap2_ptr_simd = acap2_ptr as *const __m512i;
+    let dcap1_ptr_1024_simd = dcap1_ptr_1024 as *const __m512i;
+    let dcap2_ptr_1024_simd = dcap2_ptr_1024 as *const __m512i;
     let s_ptr_packed = s.as_ptr() as *const u8;
-    for j in 0..height {
+    for j in 0..height_4{
         let s_row_offset_bytes = j << 19; 
-        let a1_ptr = acap1_ptr_simd.add(j << 6);
-        let a2_ptr = acap2_ptr_simd.add(j << 6);
+        let a1_ptr = dcap1_ptr_1024_simd.add(j << 6);
+        let a2_ptr = dcap2_ptr_1024_simd.add(j << 6);
         for i in 0..width{
             let mut s1 = Align64([0u32; 1024]);
             let mut s2 = Align64([0u32; 1024]);
@@ -136,18 +142,20 @@ pub unsafe fn commit(u: &mut [u32], r: &mut [u32], t: &mut [u32], s: &[u8], acap
         // decompose t
         for j in 0..64{
             let mut val = _mm512_loadu_si512(t_ptr.add((i<<6)+j));
-            for k in 0..8{
-                _mm512_storeu_si512((gt_ptr.add((i<<9)+(k<<6)+j)) as *mut _ , _mm512_and_epi32(mask15, val));
-                val = _mm512_srli_epi32(val, 4);
+            for k in 0..16{
+                _mm512_storeu_si512((gt_ptr.add((i<<10)+(k<<6)+j)) as *mut _ , _mm512_and_epi32(mask3, val));
+                val = _mm512_srli_epi32(val, 2);
             }
         }
     }
 
     // Bt
+    let dcap1_ptr_2048_simd = dcap1_ptr_2048 as *const __m512i;
+    let dcap2_ptr_2048_simd = dcap2_ptr_2048 as *const __m512i;
     let mut v1 = [_mm512_set1_epi32(0); 128];
     let mut v2 = [_mm512_set1_epi32(0); 128];
     // Ring inner product
-    for i in 0..height{
+    for i in 0..height_2{
         let mut gt1 = Align64([0u32; 2048]);
         gt1.0[0..1024].copy_from_slice(&t[i<<10..(i+1)<<10]);
         let mut gt2 = gt1;
@@ -158,10 +166,10 @@ pub unsafe fn commit(u: &mut [u32], r: &mut [u32], t: &mut [u32], s: &[u8], acap
         for j in 0..128 {
             let gt1_vec = _mm512_loadu_si512(gt1_ptr.add(j));
             let gt2_vec = _mm512_loadu_si512(gt2_ptr.add(j));
-            let b1_vec = _mm512_loadu_si512(bcap1_ptr.add((i<<7)+j));
-            let b2_vec = _mm512_loadu_si512(bcap2_ptr.add((i<<7)+j));
-            v1[j] = barrett_fake_2079301633(_mm512_add_epi32(v1[j], montproduct(gt1_vec, b1_vec, q3, q3_inv)));
-            v2[j] = barrett_fake_2079305729(_mm512_add_epi32(v2[j], montproduct(gt2_vec, b2_vec, q4, q4_inv)));
+            let d1_vec = _mm512_loadu_si512(dcap1_ptr_2048_simd.add((i<<7)+j));
+            let d2_vec = _mm512_loadu_si512(dcap2_ptr_2048_simd.add((i<<7)+j));
+            v1[j] = barrett_fake_2079301633(_mm512_add_epi32(v1[j], montproduct(gt1_vec, d1_vec, q3, q3_inv)));
+            v2[j] = barrett_fake_2079305729(_mm512_add_epi32(v2[j], montproduct(gt2_vec, d2_vec, q4, q4_inv)));
         }
     }
     for i in 0..128 {

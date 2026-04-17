@@ -6,26 +6,24 @@ use crate::utils::ds::AlignedU32Vec;
 
 pub struct SetupParams {
     pub constraints: usize,
-    pub height: usize,
+    pub height_2: usize,
+    pub height_4: usize,
     pub n: usize,
     pub q: u32,
     pub q64: u64,
     pub plans: Vec<Plan>,
-    pub g_matrix: Vec<u32>,
-    pub d0: AlignedU32Vec,
-    pub d1: AlignedU32Vec,
-    pub d2: AlignedU32Vec,
-    pub d3: AlignedU32Vec,
-    pub b: AlignedU32Vec,
-    pub a: AlignedU32Vec,
-    pub w_i: [u32; 19],
+    pub g_matrix_2: Vec<u32>,
+    pub g_matrix_4: Vec<u32>,
+    pub d: AlignedU32Vec,
+    pub e: AlignedU32Vec,
+    pub w_i: [u32; 7],
 }
 
-fn compute_w_i() -> [u32; 19] {
-    let mut w = [0u32; 19];
-    for i in 0..19usize {
+fn compute_w_i() -> [u32; 7] {
+    let mut w = [0u32; 7];
+    for i in 0..7usize {
         let mut denom = 1u64;
-        for j in 0..19usize {
+        for j in 0..7usize {
             if i != j {
                 let diff = if i > j { 
                     (i - j) as u64 
@@ -41,32 +39,35 @@ fn compute_w_i() -> [u32; 19] {
 }
 
 pub fn setup() -> SetupParams{
-    let constraints = 11;
-    let height = 1 << 13;
-    let n = 1 << 10;
+    let constraints = 15;
+    let height_2 = 1<<14;
+    let height_4 = 1<<13;
+    let n = 1<<10;
     let q = 4294967197u32;
     let q64 = 4294967197u64;
     let moduli = [2079301633, 2079305729];
     let plans: Vec<Plan> = moduli.iter().map(|&m| Plan::try_new(1<<11, m).unwrap()).collect();
-    let mut g_matrix = vec![0u32; 8];
-    for i in 0..8 {
-        g_matrix[i] = 1 << (i * 4);
+    let mut g_matrix_2 = vec![0u32; 16];
+    for i in 0..16{
+        g_matrix_2[i] = 1<<(i*2);
     }
-    let d0 = generate_random_q_element(height, n);
-    let d1 = generate_random_q_element(height, n);
-    let d2 = generate_random_q_element(height, n);
-    let d3 = generate_random_q_element(height, n);
-    let b = generate_random_q_element(height, n);
-    let a = generate_random_q_element(height, n);
+    let mut g_matrix_4 = vec![0u32; 8];
+    for i in 0..8{
+        g_matrix_4[i] = 1<<(i*4);
+    }
+    let d = generate_random_q_element(height_2, n);
+    let e = generate_random_q_element(64, n);
     let w_i = compute_w_i();
-    SetupParams {
+    SetupParams{
         constraints,
-        height,
+        height_2,
+        height_4,
         n,
         q, q64,
         plans,
-        g_matrix,
-        d0, d1, d2, d3, b, a,
+        g_matrix_2,
+        g_matrix_4,
+        d, e,
         w_i,
     }
 }

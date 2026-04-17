@@ -77,8 +77,8 @@ unsafe fn build_eq_tbl_base(tau: &[[u32; 4]]) -> Vec<[u32; 4]> {
 }
 
 pub unsafe fn build_eq_tbl_split(tau: &[[u32; 4]]) -> (Vec<[u32; 4]>, Vec<[u32; 4]>) {
-    let high_tau = &tau[0..17]; 
-    let low_tau = &tau[17..27];
+    let high_tau = &tau[0..18]; 
+    let low_tau = &tau[18..28];
 
     let eq_high = build_eq_tbl_base(high_tau);
     let eq_low = build_eq_tbl_base(low_tau);

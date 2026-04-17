@@ -45,10 +45,16 @@ fn main(){
     let start = Instant::now();
 
     // prepare polynomial
-    let s  = generate_random_data_4bit_packed(params.height*params.n, params.n);
+    let s  = generate_random_data_4bit_packed(params.height_4*params.n, params.n);
     
     let duration = start.elapsed();
     println!("Prepare polynomial f: {:?}", duration);
+    let start = Instant::now();
+
+    let challenge = sample_challenge(&params);
+
+    let duration = start.elapsed();
+    println!("Sample challenge: {:?}", duration);
     let start = Instant::now();
     
     // commit
@@ -59,14 +65,14 @@ fn main(){
     let start = Instant::now();
 
     // prove
-    let (proof, target_sum, tau_0, alpha) = unsafe { prove(&params, &s, commitment) };
+    let (proof, target_sum) = unsafe { prove(&params, &s, commitment, &challenge) };
     
     let duration = start.elapsed();
     println!("Prove: {:?}", duration);
     let start_verify = std::time::Instant::now();
     
     // Verifier
-    let is_valid = verify(&params, &proof, target_sum, &tau_0, &alpha);
+    let is_valid = verify(&params, &proof, target_sum, &challenge);
 
     let verify_duration = start_verify.elapsed();
     assert!(is_valid, "Failed");

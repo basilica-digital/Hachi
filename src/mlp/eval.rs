@@ -5,8 +5,8 @@ pub unsafe fn eval_final_eq(r_x: &[[u32; 4]], r_y: &[[u32; 4]], tau_0: &[[u32; 4
     let (mut eq_low, mut eq_high) = build_eq_tbl_split(tau_0);
     let ext_one = [1u32, 0, 0, 0];
     let mut cumulative_high = [1u32, 0, 0, 0];
-    let mut h_len = 1 << 17;
-    for round in 0..17 {
+    let mut h_len = 1 << 18;
+    for round in 0..18 {
         let r = &r_x[round];
         let h_half = h_len / 2;
         
@@ -18,7 +18,7 @@ pub unsafe fn eval_final_eq(r_x: &[[u32; 4]], r_y: &[[u32; 4]], tau_0: &[[u32; 4
         h_len = h_half;
         
         let mut found_idx = -1;
-        for test_idx in 0..27 {
+        for test_idx in 0..28 {
             let t_val = &tau_0[test_idx];
             let r_t = ext_mul_val(r, t_val);
             let mut factor = extadd(&ext_one, &extadd(&r_t, &r_t));
@@ -48,7 +48,7 @@ pub unsafe fn eval_final_eq(r_x: &[[u32; 4]], r_y: &[[u32; 4]], tau_0: &[[u32; 4
         l_len = l_half;
         
         let mut found_idx = -1;
-        for test_idx in 0..27 {
+        for test_idx in 0..28 {
             let t_val = &tau_0[test_idx];
             let r_t = ext_mul_val(r, t_val);
             let mut factor = extadd(&ext_one, &extadd(&r_t, &r_t));
@@ -98,9 +98,9 @@ pub fn eval_step_indicator(k_bound: usize, r_x: &[[u32; 4]], r_y: &[[u32; 4]]) -
     let mut prefix_eq = [1u32, 0, 0, 0];
     let ext_one = [1u32, 0, 0, 0];
 
-    for j in 0..27 {
-        let r_j = if j < 17 { &r_x[j] } else { &r_y[j - 17] };
-        let bit = (k_bound >> (26 - j)) & 1;
+    for j in 0..28 {
+        let r_j = if j < 18 { &r_x[j] } else { &r_y[j - 18] };
+        let bit = (k_bound >> (27 - j)) & 1;
 
         let one_minus_r = ext_sub(&ext_one, r_j);
 

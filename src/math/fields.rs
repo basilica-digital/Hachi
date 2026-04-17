@@ -1,6 +1,17 @@
 use crate::Q;
 
 #[inline(always)]
+pub fn final_reduce(mut x: u64) -> u32 {
+    let q = 4294967197u64;
+    x = (x & 0xFFFFFFFF) + (x >> 32) * 99;
+    x = (x & 0xFFFFFFFF) + (x >> 32) * 99;
+    if x >= q { 
+        x -= q; 
+    }
+    x as u32
+}
+
+#[inline(always)]
 pub fn ext_mul_val(a: &[u32; 4], b: &[u32; 4]) -> [u32; 4] {
     let mut c = [0u32; 4];
     extmul(&mut c, a, b);
@@ -120,10 +131,20 @@ pub fn ext_div_2(a: &[u32; 4]) -> [u32; 4] {
 }
 
 #[inline(always)]
-pub fn ext_base_mla(c: &mut [u32], a: &[u32], b: u32){
-    let q = (1u64 << 32) - 99;
-    for i in 0..4{
-        c[i] = ((c[i] as u64 + (a[i] as u64 * b as u64)) % q) as u32;
+pub fn ext_base_mla(acc: &mut [u32], a: &[u32], b: u32) {
+    let q = 4294967197u64;
+    let b_u64 = b as u64;
+    
+    for i in 0..4 {
+        let prod = (a[i] as u64) * b_u64;
+        let res1 = (prod & 0xFFFFFFFF) + (prod >> 32) * 99;
+        let mut res2 = (res1 & 0xFFFFFFFF) + (res1 >> 32) * 99;
+        res2 += acc[i] as u64;
+        let mut res3 = (res2 & 0xFFFFFFFF) + (res2 >> 32) * 99;
+        if res3 >= q {
+            res3 -= q;
+        }
+        acc[i] = res3 as u32;
     }
 }
 
@@ -157,24 +178,24 @@ pub fn ext_scalar_mul(a: &[u32; 4], b: u32) -> [u32; 4] {
     c
 }
 
-pub fn eval_degree_18(p: &[[u32; 4]; 19], r: &[u32; 4], w_i: &[u32; 19]) -> [u32; 4] {
-    if r[1] == 0 && r[2] == 0 && r[3] == 0 && r[0] < 19 {
+pub fn eval_degree_6(p: &[[u32; 4]; 7], r: &[u32; 4], w_i: &[u32; 7]) -> [u32; 4] {
+    if r[1] == 0 && r[2] == 0 && r[3] == 0 && r[0] < 7 {
         return p[r[0] as usize];
     }
     
-    let mut pref = [[0u32; 4]; 19];
-    let mut suff = [[0u32; 4]; 19];
+    let mut pref = [[0u32; 4]; 7];
+    let mut suff = [[0u32; 4]; 7];
     
     let mut current_pref = [1u32, 0, 0, 0];
-    for i in 0..19 {
+    for i in 0..7 {
         pref[i] = current_pref;
         let mut r_minus_i = *r;
         r_minus_i[0] = ((r_minus_i[0] as u64 + Q as u64 - i as u64) % Q as u64) as u32;
         current_pref = ext_mul_val(&current_pref, &r_minus_i);
     }
-    
+
     let mut current_suff = [1u32, 0, 0, 0];
-    for i in (0..19).rev() {
+    for i in (0..7).rev() {
         suff[i] = current_suff;
         let mut r_minus_i = *r;
         r_minus_i[0] = ((r_minus_i[0] as u64 + Q as u64 - i as u64) % Q as u64) as u32;
@@ -182,7 +203,7 @@ pub fn eval_degree_18(p: &[[u32; 4]; 19], r: &[u32; 4], w_i: &[u32; 19]) -> [u32
     }
     
     let mut res = [0u32; 4];
-    for i in 0..19 {
+    for i in 0..7 {
         let mut l_i = ext_mul_val(&pref[i], &suff[i]);
         l_i = ext_scalar_mul(&l_i, w_i[i]);
         let term = ext_mul_val(&l_i, &p[i]);

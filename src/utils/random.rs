@@ -52,6 +52,20 @@ pub fn generate_fs_eval_points_q(rng: &mut ChaCha12Rng, sz: usize, n: usize) -> 
     AlignedU32Vec { inner: data, len: total_u32 }
 }
 
+pub fn generate_random_eval_points_q(sz: usize, n: usize) -> AlignedU32Vec {
+    let total_u32 = sz * n;
+    assert!(total_u32 % 16 == 0, "Total length must be a multiple of 16");
+    let total_chunks = total_u32 / 16;
+    let ring_size = n / 16;
+    let mut data = vec![Align64([0u32; 16]); total_chunks];
+    let q = 4294967197u32;
+    let mut rng = rand::thread_rng(); 
+    for i in 0..sz {
+        data[i * ring_size].0[0] = rng.gen_range(0..q);
+    }
+    AlignedU32Vec { inner: data, len: total_u32 }
+}
+
 pub fn generate_sparse_c_idx(num_rings: usize) -> Vec<i16> {
     let n = 16;
     let mut c = Vec::with_capacity(num_rings * n);

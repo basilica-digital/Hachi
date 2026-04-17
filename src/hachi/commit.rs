@@ -9,7 +9,7 @@ pub struct Commitment {
 }
 
 pub fn Commit(params: &SetupParams, s: &AlignedU8Vec) -> Commitment {
-    let total_len = params.height * params.n;
+    let total_len = params.height_2 * params.n;
     let mut r = AlignedU32Vec {
         inner: vec![Align64([0u32; 16]); params.n / 16],
         len: params.n,
@@ -23,7 +23,7 @@ pub fn Commit(params: &SetupParams, s: &AlignedU8Vec) -> Commitment {
         len: params.n,
     };
     unsafe {
-        commit(&mut u, &mut r[0..params.n], &mut t, s, &params.a, &params.b);
+        commit(&mut u, &mut r[0..params.n], &mut t, s, &params.d);
     }
     Commitment{u, r, t}
 }
