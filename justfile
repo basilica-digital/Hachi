@@ -1,12 +1,16 @@
 flags := "-C target-cpu=native -C codegen-units=1"
 threads := "16"
 seed := "0"
+# Override the witness byte size: e.g. `just size=1GB gen-witness`. Empty
+# string means "use the size expected by the configured scheme parameters".
+size := ""
 witness := "witness.bin"
 commitment := "commitment.bin"
 proof := "proof.bin"
 
 # Shared cargo invocation: release build with native CPU tuning + Rayon threads.
 cargo := 'RAYON_NUM_THREADS=' + threads + ' RUSTFLAGS="' + flags + '" cargo run --release --'
+size_arg := if size == "" { "" } else { "--size " + size }
 
 # Default recipe: list available commands.
 default:
@@ -15,9 +19,9 @@ default:
 # Full pipeline: generate a witness, commit, prove, and verify.
 all: gen-witness commit prove verify
 
-# Generate a random witness sized to the setup parameters.
+# Generate a random witness sized to the setup parameters (or `size` if set).
 gen-witness:
-    {{cargo}} gen-witness --seed {{seed}} --output {{witness}}
+    {{cargo}} gen-witness --seed {{seed}} --output {{witness}} {{size_arg}}
 
 # Commit to the witness, producing a commitment file.
 commit:
