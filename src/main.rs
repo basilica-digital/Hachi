@@ -16,10 +16,11 @@ use crate::hachi::prove::prove;
 use crate::hachi::setup::setup_with_seed;
 use crate::hachi::verify::{sample_challenge, verify};
 use crate::utils::ds::*;
-use crate::utils::random::generate_random_data_4bit_packed;
+use crate::utils::random::{generate_random_bytes_4bit_packed, stream_random_witness_to};
 use crate::utils::serialize::{
     read_commitment, read_proof, read_witness, write_commitment, write_proof, write_witness,
 };
+use crate::utils::size::{format_size, parse_size};
 
 // Re-exports used by submodules via `crate::`.
 pub use crate::hachi::setup::SetupParams;
@@ -48,6 +49,17 @@ enum Commands {
         /// matrix dimensions only — witness bytes are drawn from the OS RNG).
         #[arg(short, long, default_value_t = 0)]
         seed: u64,
+
+        /// Target witness size, e.g. `1GB`, `10GiB`, `1TB`, `10KB`, or `1024`.
+        /// Units use powers of 1024 and are case-insensitive. Must be a
+        /// multiple of 16 bytes. When omitted, defaults to the size expected
+        /// by the configured scheme parameters.
+        ///
+        /// NOTE: `commit`, `prove`, and `verify` still assume the
+        /// scheme-default witness size; `--size` is useful for isolating
+        /// `gen-witness` / witness-I/O benchmarks at other sizes.
+        #[arg(short = 'S', long)]
+        size: Option<String>,
     },
 
     /// Commit to a witness polynomial.
@@ -104,23 +116,79 @@ fn main() {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::GenWitness { output, seed } => {
+        Commands::GenWitness {
+            output,
+            seed,
+            size,
+        } => {
             let start = Instant::now();
             let params = setup_with_seed(seed);
             println!("Setup: {:?}", start.elapsed());
 
-            let start = Instant::now();
-            // Witness shape matches what `prep::commit::commit` expects: a
-            // `height_4 × n` grid of ring elements, each of `n` 4-bit
-            // coefficients (i.e. `height_4 * n * n` nibbles total).
-            let witness =
-                generate_random_data_4bit_packed(params.height_4 * params.n, params.n);
-            println!("Generate witness: {:?}", start.elapsed());
+            // Witness shape expected by `prep::commit::commit`: a `height_4 × n`
+            // grid of ring elements, each with `n` 4-bit coefficients.
+            let expected_bytes = params.height_4 * params.n * params.n / 2;
 
-            write_witness(&output, &witness).unwrap_or_else(|e| {
-                eprintln!("error: failed to write witness: {e}");
+            let requested_bytes: usize = match size {
+                Some(s) => parse_size(&s)
+                    .and_then(|b| {
+                        usize::try_from(b).map_err(|_| format!("size {b} exceeds usize"))
+                    })
+                    .unwrap_or_else(|e| {
+                        eprintln!("error: invalid --size: {e}");
+                        process::exit(1);
+                    }),
+                None => expected_bytes,
+            };
+
+            if requested_bytes % 16 != 0 {
+                eprintln!(
+                    "error: witness size must be a multiple of 16 bytes (got {requested_bytes})"
+                );
                 process::exit(1);
-            });
+            }
+
+            if requested_bytes != expected_bytes {
+                eprintln!(
+                    "warning: requested witness size {} differs from the scheme-default {}. \
+                     `commit`, `prove`, and `verify` assume the scheme-default size and will \
+                     fail or produce invalid results on a differently sized witness.",
+                    format_size(requested_bytes as u64),
+                    format_size(expected_bytes as u64),
+                );
+            }
+
+            // Stream to disk when the witness would be large enough that
+            // holding it in RAM is risky. The in-memory path keeps driving
+            // the scheme-default (~4 GiB) case so tests/benchmarks are
+            // unchanged.
+            const STREAM_THRESHOLD: usize = 16 * (1 << 30); // 16 GiB
+            const STREAM_CHUNK: usize = 256 * (1 << 20); // 256 MiB per chunk
+
+            let start = Instant::now();
+            if requested_bytes >= STREAM_THRESHOLD {
+                stream_random_witness_to(&output, requested_bytes as u64, STREAM_CHUNK)
+                    .unwrap_or_else(|e| {
+                        eprintln!("error: failed to write witness: {e}");
+                        process::exit(1);
+                    });
+                println!(
+                    "Generate+write witness ({}, streamed): {:?}",
+                    format_size(requested_bytes as u64),
+                    start.elapsed()
+                );
+            } else {
+                let witness = generate_random_bytes_4bit_packed(requested_bytes);
+                println!(
+                    "Generate witness ({}): {:?}",
+                    format_size(requested_bytes as u64),
+                    start.elapsed()
+                );
+                write_witness(&output, &witness).unwrap_or_else(|e| {
+                    eprintln!("error: failed to write witness: {e}");
+                    process::exit(1);
+                });
+            }
             println!("Witness written to {}", output.display());
         }
 
