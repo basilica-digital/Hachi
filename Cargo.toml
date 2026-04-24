@@ -3,6 +3,14 @@ name = "Hachi30"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "hachi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hachi"
+path = "src/main.rs"
+
 [dependencies]
 tfhe-ntt = { version = "0.6.1", features = ["nightly"] }
 rand = "0.8"
@@ -13,6 +21,13 @@ blake3 = "1.5"
 rand_chacha = "0.3"
 clap = { version = "4", features = ["derive"] }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "hachi"
+harness = false
+
 [lints.rust]
 warnings = "allow"
 
@@ -22,3 +37,10 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 panic = "abort"
+
+# Benchmarks share the release profile's tuning (LTO, single codegen unit,
+# AVX-512 from `target-cpu=native` via .cargo/config or RUSTFLAGS).
+[profile.bench]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

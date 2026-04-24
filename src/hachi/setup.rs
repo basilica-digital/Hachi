@@ -6,6 +6,10 @@ use crate::utils::ds::AlignedU32Vec;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 
+/// Witness size produced by the current scheme parameters: `height_4 * n * n / 2`
+/// bytes, with `height_4 = 2^13` and `n = 2^10`.
+pub const DEFAULT_WITNESS_SIZE_BYTES: u64 = (1u64 << 13) * (1u64 << 10) * (1u64 << 10) / 2;
+
 pub struct SetupParams {
     pub constraints: usize,
     pub height_2: usize,
@@ -19,6 +23,17 @@ pub struct SetupParams {
     pub d: AlignedU32Vec,
     pub e: AlignedU32Vec,
     pub w_i: [u32; 7],
+}
+
+impl SetupParams {
+    /// Witness size in bytes implied by the current matrix dimensions.
+    ///
+    /// 4-bit-packed: `height_4 * n * n / 2` bytes. Today this is 4 GiB; the
+    /// constant is exposed so benchmarks and CLI callers can compute the
+    /// supported size without duplicating the formula.
+    pub fn witness_size_bytes(&self) -> u64 {
+        (self.height_4 as u64) * (self.n as u64) * (self.n as u64) / 2
+    }
 }
 
 fn compute_w_i() -> [u32; 7] {
@@ -38,6 +53,26 @@ fn compute_w_i() -> [u32; 7] {
         w[i] = mod_inverse(denom, Q as u64) as u32;
     }
     w
+}
+
+/// Deterministic setup that targets a specific witness byte count.
+///
+/// Currently only [`DEFAULT_WITNESS_SIZE_BYTES`] (4 GiB) is supported because
+/// many of the inner loops use literal `1<<13` / `1<<14` constants. The
+/// signature is in place so callers (benchmarks, CLI) can sweep over
+/// `witness_size_bytes` once the SIMD code below is generalised; for now
+/// passing any other value returns an error.
+pub fn setup_with_seed_and_size(
+    seed: u64,
+    witness_size_bytes: u64,
+) -> Result<SetupParams, String> {
+    if witness_size_bytes != DEFAULT_WITNESS_SIZE_BYTES {
+        return Err(format!(
+            "witness_size_bytes={witness_size_bytes} unsupported; only {} is wired up today",
+            DEFAULT_WITNESS_SIZE_BYTES
+        ));
+    }
+    Ok(setup_with_seed(seed))
 }
 
 /// Deterministic setup: same `seed` always produces identical parameters.

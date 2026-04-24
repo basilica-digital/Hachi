@@ -38,3 +38,9 @@ verify:
 # Remove generated witness, commitment, and proof artefacts.
 clean:
     rm -f {{witness}} {{commitment}} {{proof}}
+
+# Run criterion benchmarks (commit / prove / verify, parameterised by
+# witness size). Each iteration allocates ~4 GiB plus the prover's
+# intermediate state — make sure the host has the memory headroom.
+bench:
+    RAYON_NUM_THREADS={{threads}} RUSTFLAGS="{{flags}}" cargo bench --bench hachi
