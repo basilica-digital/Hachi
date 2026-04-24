@@ -1,33 +1,18 @@
-mod math;
-mod mlp;
-mod sumcheck;
-mod utils;
-mod prep;
-mod hachi;
-
 use std::path::PathBuf;
 use std::process;
 use std::time::Instant;
 
 use clap::{Parser, Subcommand};
 
-use crate::hachi::commit::Commit;
-use crate::hachi::prove::prove;
-use crate::hachi::setup::setup_with_seed;
-use crate::hachi::verify::{sample_challenge, verify};
-use crate::utils::ds::*;
-use crate::utils::random::{generate_random_bytes_4bit_packed, stream_random_witness_to};
-use crate::utils::serialize::{
+use hachi::hachi::commit::Commit;
+use hachi::hachi::prove::prove;
+use hachi::hachi::setup::setup_with_seed;
+use hachi::hachi::verify::{sample_challenge, verify};
+use hachi::utils::random::{generate_random_bytes_4bit_packed, stream_random_witness_to};
+use hachi::utils::serialize::{
     read_commitment, read_proof, read_witness, write_commitment, write_proof, write_witness,
 };
-use crate::utils::size::{format_size, parse_size};
-
-// Re-exports used by submodules via `crate::`.
-pub use crate::hachi::setup::SetupParams;
-pub use crate::math::field_simd::u642u32;
-pub use crate::math::fields::{ext_sub, extmul};
-
-const Q: u32 = 4294967197;
+use hachi::utils::size::{format_size, parse_size};
 
 /// Hachi — lattice-based polynomial commitment scheme.
 #[derive(Parser)]
