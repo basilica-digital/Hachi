@@ -44,3 +44,14 @@ clean:
 # intermediate state — make sure the host has the memory headroom.
 bench:
     RAYON_NUM_THREADS={{threads}} RUSTFLAGS="{{flags}}" cargo bench --bench hachi
+
+# Fast tests only (determinism of setup + challenge). Safe to run on any
+# AVX-512 host; a few seconds.
+test-fast:
+    RUSTFLAGS="{{flags}}" cargo test --release --test determinism
+
+# Full test suite, including the ignored end-to-end pipeline tests.
+# Each run allocates ~4 GiB for the witness plus several GiB of prover
+# intermediate state, so we force `--test-threads=1`.
+test:
+    RAYON_NUM_THREADS={{threads}} RUSTFLAGS="{{flags}}" cargo test --release -- --include-ignored --test-threads=1
